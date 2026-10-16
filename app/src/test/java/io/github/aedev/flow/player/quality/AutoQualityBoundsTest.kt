@@ -6,7 +6,10 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AutoQualityBoundsTest {
-    private fun heights(range: AutoQualityRange, vararg all: Int) = range.restrict(all.toList()) { it }
+    private fun heights(
+        range: AutoQualityRange,
+        vararg all: Int,
+    ) = range.restrict(all.toList()) { it }
 
     @Test
     fun `with nothing set Auto keeps its old range, 480p up with no ceiling`() {

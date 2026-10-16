@@ -49,8 +49,7 @@ object SharedPlayerCacheProvider {
     fun getOrCreate(
         context: Context,
         maxCacheSizeBytes: Long = PlayerConfig.CACHE_SIZE_BYTES,
-    ): SimpleCache =
-        cache ?: create(context, PlayerConfig.CACHE_DIR_NAME, maxCacheSizeBytes) { videoEvictor = it }.also { cache = it }
+    ): SimpleCache = cache ?: create(context, PlayerConfig.CACHE_DIR_NAME, maxCacheSizeBytes) { videoEvictor = it }.also { cache = it }
 
     /** Returns the song cache, creating it on first call; only the first call's size is used. */
     @Synchronized
@@ -85,7 +84,10 @@ object SharedPlayerCacheProvider {
      */
     private fun purgeLegacyStreams(target: SimpleCache) {
         runCatching {
-            target.keys.toList().filter { it.contains("/videoplayback") }.forEach { target.removeResource(it) }
+            target.keys
+                .toList()
+                .filter { it.contains("/videoplayback") }
+                .forEach { target.removeResource(it) }
         }.onFailure { Log.w(TAG, "Could not drop legacy stream copies", it) }
     }
 

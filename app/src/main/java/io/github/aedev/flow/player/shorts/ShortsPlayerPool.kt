@@ -28,6 +28,7 @@ import androidx.media3.exoplayer.source.MergingMediaSource
 import androidx.media3.exoplayer.source.ProgressiveMediaSource
 import androidx.media3.exoplayer.trackselection.AdaptiveTrackSelection
 import androidx.media3.exoplayer.trackselection.DefaultTrackSelector
+import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import androidx.media3.session.MediaSession
 import dagger.hilt.android.EntryPointAccessors
 import io.github.aedev.flow.data.local.PlayerPreferences
@@ -43,7 +44,6 @@ import io.github.aedev.flow.player.config.VideoSizeCap
 import io.github.aedev.flow.player.datasource.YouTubeHttpDataSource
 import io.github.aedev.flow.player.factory.LoadControlFactory
 import io.github.aedev.flow.player.quality.MeasuredSpeed
-import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
 import io.github.aedev.flow.player.resolver.MediaSourceBuilder
 import io.github.aedev.flow.utils.NetworkState
 import kotlinx.coroutines.CoroutineScope
@@ -344,10 +344,14 @@ class ShortsPlayerPool private constructor() {
                 //   start could never be replaced;
                 // - trust 80% of the measured speed: clips are short and the next ones are prefetched.
                 AdaptiveTrackSelection.Factory(
-                    /* minDurationForQualityIncreaseMs = */ 1_500,
-                    /* maxDurationForQualityDecreaseMs = */ 5_000,
-                    /* minDurationToRetainAfterDiscardMs = */ 2_000,
-                    /* bandwidthFraction = */ 0.8f,
+                    // minDurationForQualityIncreaseMs =
+                    1_500,
+                    // maxDurationForQualityDecreaseMs =
+                    5_000,
+                    // minDurationToRetainAfterDiscardMs =
+                    2_000,
+                    // bandwidthFraction =
+                    0.8f,
                 ),
             ).apply {
                 val builder =
@@ -390,7 +394,9 @@ class ShortsPlayerPool private constructor() {
                 DefaultBandwidthMeter
                     .Builder(context)
                     .apply {
-                        MeasuredSpeed.read(context, NetworkState.isOnWifi(context)).takeIf { it > 0L }
+                        MeasuredSpeed
+                            .read(context, NetworkState.isOnWifi(context))
+                            .takeIf { it > 0L }
                             ?.let { bps -> setInitialBitrateEstimate(bps) }
                     }.build(),
             ).setAudioAttributes(

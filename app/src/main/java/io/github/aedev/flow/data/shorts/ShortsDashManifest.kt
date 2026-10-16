@@ -1,9 +1,9 @@
 package io.github.aedev.flow.data.shorts
 
 import io.github.aedev.flow.innertube.models.response.PlayerResponse
+import io.github.aedev.flow.player.quality.AdaptiveLadder
 import io.github.aedev.flow.player.resolver.ManifestGenerator
 import io.github.aedev.flow.player.stream.InnerTubeStreamBridge
-import io.github.aedev.flow.player.quality.AdaptiveLadder
 import org.schabi.newpipe.extractor.stream.Stream
 import org.schabi.newpipe.extractor.stream.VideoStream
 

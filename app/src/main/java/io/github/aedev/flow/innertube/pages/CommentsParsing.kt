@@ -131,14 +131,34 @@ internal fun JsonElement.findGifUrl(): String? {
 
     fun walk(node: JsonElement?) {
         when (node) {
-            is JsonObject -> node.values.forEach(::walk)
-            is kotlinx.serialization.json.JsonArray -> node.forEach(::walk)
-            is JsonPrimitive -> node.content.takeIf { it.startsWith("http") && it.contains("tenor.com", ignoreCase = true) }?.let(found::add)
-            else -> Unit
+            is JsonObject -> {
+                node.values.forEach(::walk)
+            }
+
+            is kotlinx.serialization.json.JsonArray -> {
+                node.forEach(::walk)
+            }
+
+            is JsonPrimitive -> {
+                node.content
+                    .takeIf {
+                        it.startsWith(
+                            "http",
+                        ) && it.contains("tenor.com", ignoreCase = true)
+                    }?.let(found::add)
+            }
+
+            else -> {
+                Unit
+            }
         }
     }
     walk(this)
-    val images = found.filterNot { it.substringBefore('?').endsWith(".mp4", ignoreCase = true) || it.substringBefore('?').endsWith(".webm", ignoreCase = true) }
+    val images =
+        found.filterNot {
+            it.substringBefore('?').endsWith(".mp4", ignoreCase = true) ||
+                it.substringBefore('?').endsWith(".webm", ignoreCase = true)
+        }
     return images.firstOrNull { it.substringBefore('?').endsWith(".gif", ignoreCase = true) } ?: images.firstOrNull()
 }
 

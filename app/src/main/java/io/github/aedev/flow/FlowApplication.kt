@@ -11,7 +11,6 @@ import dagger.hilt.android.HiltAndroidApp
 import io.github.aedev.flow.account.AccountManager
 import io.github.aedev.flow.data.local.CONTENT_LANGUAGE_FOLLOW_APP
 import io.github.aedev.flow.data.local.DataSaver
-import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.repository.NewPipeDownloader
@@ -25,6 +24,7 @@ import io.github.aedev.flow.network.AppProxyManager
 import io.github.aedev.flow.network.VpnStateMonitor
 import io.github.aedev.flow.notification.NotificationHelper
 import io.github.aedev.flow.notification.SubscriptionCheckWorker
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.utils.AppLanguageManager
 import io.github.aedev.flow.utils.FlowCrashHandler
 import io.github.aedev.flow.utils.PerformanceDispatcher
@@ -124,22 +124,32 @@ class FlowApplication :
         // rather than at the next restart. Also drops video and songs nobody has played for a while.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             kotlinx.coroutines.delay(CACHE_ENFORCE_DELAY_MS)
-            io.github.aedev.flow.data.local.CacheJanitor.sweep(this@FlowApplication)
+            io.github.aedev.flow.data.local.CacheJanitor
+                .sweep(this@FlowApplication)
             combine(
                 playerPreferences.mediaCacheSizeMb,
                 playerPreferences.musicCacheSizeMb,
                 playerPreferences.artworkCacheSizeMb,
             ) { video, music, artwork ->
                 io.github.aedev.flow.data.local.MediaCacheLimits(
-                    videoBytes = io.github.aedev.flow.data.local.MediaCacheSizes.mediaBytes(video),
-                    musicBytes = io.github.aedev.flow.data.local.MediaCacheSizes.mediaBytes(music),
-                    artworkBytes = io.github.aedev.flow.data.local.MediaCacheSizes.artworkBytes(artwork),
+                    videoBytes =
+                        io.github.aedev.flow.data.local.MediaCacheSizes
+                            .mediaBytes(video),
+                    musicBytes =
+                        io.github.aedev.flow.data.local.MediaCacheSizes
+                            .mediaBytes(music),
+                    artworkBytes =
+                        io.github.aedev.flow.data.local.MediaCacheSizes
+                            .artworkBytes(artwork),
                 )
             }.distinctUntilChanged().collect { limits ->
-                io.github.aedev.flow.player.cache.PlayerCacheManager.publishLimits(limits)
+                io.github.aedev.flow.player.cache.PlayerCacheManager
+                    .publishLimits(limits)
                 runCatching {
-                    io.github.aedev.flow.player.cache.PlayerCacheManager.preload(this@FlowApplication)
-                    io.github.aedev.flow.player.cache.SharedPlayerCacheProvider.enforce(limits)
+                    io.github.aedev.flow.player.cache.PlayerCacheManager
+                        .preload(this@FlowApplication)
+                    io.github.aedev.flow.player.cache.SharedPlayerCacheProvider
+                        .enforce(limits)
                 }.onFailure { Log.w(TAG, "Could not enforce the cache limits", it) }
             }
         }

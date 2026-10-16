@@ -2,9 +2,9 @@ package io.github.aedev.flow.data.shorts
 
 import android.util.Log
 import io.github.aedev.flow.data.local.DataSaver
-import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.innertube.models.response.PlayerResponse
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.player.shorts.ShortsStartupTrace
 import io.github.aedev.flow.player.stream.InFlightRequestCoalescer
 import io.github.aedev.flow.player.stream.InnerTubeVideoStreamExtractor

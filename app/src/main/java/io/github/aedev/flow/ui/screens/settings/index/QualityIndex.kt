@@ -91,5 +91,18 @@ internal object QualityIndex {
     val music = entry("music", R.string.music_quality_header, SettingsTabs.QUALITY_MUSIC, R.string.settings_quality_tab_music)
 
     val all =
-        listOf(dataSaver, autoFloor, autoCeiling, videoWifi, videoMobile, codec, fallbackCodec, thumbnailsWifi, thumbnailsMobile, shortsWifi, shortsMobile, music)
+        listOf(
+            dataSaver,
+            autoFloor,
+            autoCeiling,
+            videoWifi,
+            videoMobile,
+            codec,
+            fallbackCodec,
+            thumbnailsWifi,
+            thumbnailsMobile,
+            shortsWifi,
+            shortsMobile,
+            music,
+        )
 }

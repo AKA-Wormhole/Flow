@@ -1,48 +1,47 @@
 package io.github.aedev.flow.ui.screens.sound
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.pluralStringResource
-import androidx.compose.ui.text.font.FontWeight
-import io.github.aedev.flow.utils.formatViewCount
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -56,6 +55,7 @@ import io.github.aedev.flow.data.model.toShortVideo
 import io.github.aedev.flow.data.shorts.queue.ShortsQueueHandoff
 import io.github.aedev.flow.data.shorts.queue.ShortsQueueSource
 import io.github.aedev.flow.innertube.YouTube
+import io.github.aedev.flow.utils.formatViewCount
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -96,14 +96,21 @@ class SoundShortsViewModel
                             id = overlay?.soundBrowseId.orEmpty()
                             p = overlay?.soundParams.orEmpty()
                         }
-                        if (id.isBlank()) emptyList() else YouTube.soundShorts(id, p).getOrNull().orEmpty().map { it.toShortVideo() }
+                        if (id.isBlank()) {
+                            emptyList()
+                        } else {
+                            YouTube
+                                .soundShorts(id, p)
+                                .getOrNull()
+                                .orEmpty()
+                                .map { it.toShortVideo() }
+                        }
                     }
                 _state.value = SoundShortsState(loading = false, shorts = reels)
             }
         }
 
-        fun sourceFor(startId: String): ShortsQueueSource =
-            ShortsQueueSource.Snapshot(handoff.offer(_state.value.shorts), startId)
+        fun sourceFor(startId: String): ShortsQueueSource = ShortsQueueSource.Snapshot(handoff.offer(_state.value.shorts), startId)
     }
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -180,7 +187,11 @@ fun SoundShortsScreen(
                                                 .padding(horizontal = 6.dp, vertical = 4.dp),
                                     ) {
                                         Icon(Icons.Filled.PlayArrow, null, tint = Color.White, modifier = Modifier.size(14.dp))
-                                        Text(formatViewCount(short.viewCount), color = Color.White, style = MaterialTheme.typography.labelSmall)
+                                        Text(
+                                            formatViewCount(short.viewCount),
+                                            color = Color.White,
+                                            style = MaterialTheme.typography.labelSmall,
+                                        )
                                     }
                                 }
                             }
@@ -210,7 +221,13 @@ private fun SoundHeader(
             modifier = Modifier.size(88.dp).clip(RoundedCornerShape(12.dp)),
         )
         Column(Modifier.weight(1f).padding(start = 14.dp)) {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            Text(
+                title,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+            )
             Text(
                 pluralStringResource(R.plurals.sound_shorts_count, count, count),
                 style = MaterialTheme.typography.bodySmall,

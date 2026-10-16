@@ -156,10 +156,22 @@ fun NavGraphBuilder.flowAppGraph(
         route = SOUND_ROUTE_PATTERN,
         arguments =
             listOf(
-                navArgument("id") { type = NavType.StringType; defaultValue = "" },
-                navArgument("video") { type = NavType.StringType; defaultValue = "" },
-                navArgument("params") { type = NavType.StringType; defaultValue = "" },
-                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+                navArgument("id") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("video") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("params") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
+                navArgument("title") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                },
             ),
     ) { entry ->
         currentRoute.value = "sound"

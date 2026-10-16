@@ -7,7 +7,6 @@ import io.github.aedev.flow.data.local.ChannelSubscription
 import io.github.aedev.flow.data.local.LikedVideoInfo
 import io.github.aedev.flow.data.local.LikedVideosRepository
 import io.github.aedev.flow.data.local.SubscriptionRepository
-import io.github.aedev.flow.data.music.PlaylistRepository as MusicPlaylistRepository
 import io.github.aedev.flow.data.music.model.MusicArtist
 import io.github.aedev.flow.data.music.model.MusicTrack
 import io.github.aedev.flow.innertube.YouTube
@@ -25,6 +24,7 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 import io.github.aedev.flow.data.local.PlaylistRepository as LocalPlaylistRepository
+import io.github.aedev.flow.data.music.PlaylistRepository as MusicPlaylistRepository
 
 /**
  * Connects the Music tab to the signed-in Google account's YouTube Music library: liked songs, the
@@ -152,7 +152,12 @@ class MusicAccountSync
         }
 
         private suspend fun importHistory() {
-            val sections = YouTube.musicHistory().getOrThrow().sections.orEmpty()
+            val sections =
+                YouTube
+                    .musicHistory()
+                    .getOrThrow()
+                    .sections
+                    .orEmpty()
             val tracks = sections.flatMap { it.songs }.map { it.toTrack() }.distinctBy { it.videoId }
             if (tracks.isEmpty()) return
             musicPlaylists.importHistory(tracks)

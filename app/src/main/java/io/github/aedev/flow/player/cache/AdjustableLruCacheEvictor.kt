@@ -139,7 +139,13 @@ class AdjustableLruCacheEvictor(
             rhs: CacheSpan,
         ): Int {
             val delta = lhs.lastTouchTimestamp - rhs.lastTouchTimestamp
-            return if (delta == 0L) lhs.compareTo(rhs) else if (lhs.lastTouchTimestamp < rhs.lastTouchTimestamp) -1 else 1
+            return if (delta == 0L) {
+                lhs.compareTo(rhs)
+            } else if (lhs.lastTouchTimestamp < rhs.lastTouchTimestamp) {
+                -1
+            } else {
+                1
+            }
         }
     }
 }
