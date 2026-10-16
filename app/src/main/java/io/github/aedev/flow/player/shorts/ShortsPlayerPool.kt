@@ -88,6 +88,7 @@ class ShortsPlayerPool private constructor() {
         private const val WATCHDOG_INTERVAL_MS = 3_000L
         private const val WATCHDOG_TICKS_TO_TRIGGER = 2
         private const val RECOVERY_RESET_MS = 30_000L
+        private const val REPRESENTATION_TAG = "<Representation "
 
         @Volatile
         private var instance: ShortsPlayerPool? = null
@@ -334,12 +335,19 @@ class ShortsPlayerPool private constructor() {
         val trackSelector =
             DefaultTrackSelector(
                 context,
-                // YouTube-style Auto: step up after ~3 s of buffer, step down fast, 70% of measured speed.
+                // YouTube-style Auto for short clips:
+                // - step up as soon as ~1.5 s is buffered (a reel is over in 15-60 s, so waiting longer
+                //   means the whole clip plays at the starting rung);
+                // - step down only when the buffer is really running low (< 5 s), not while it is full;
+                // - after a step up, re-fetch whatever is buffered beyond 2 s at the better rung. The old
+                //   25 s retain window was longer than the 8 s Shorts buffer, so a low rung picked at
+                //   start could never be replaced;
+                // - trust 80% of the measured speed: clips are short and the next ones are prefetched.
                 AdaptiveTrackSelection.Factory(
-                    /* minDurationForQualityIncreaseMs = */ 3_000,
-                    /* maxDurationForQualityDecreaseMs = */ 10_000,
-                    /* minDurationToRetainAfterDiscardMs = */ 25_000,
-                    /* bandwidthFraction = */ 0.7f,
+                    /* minDurationForQualityIncreaseMs = */ 1_500,
+                    /* maxDurationForQualityDecreaseMs = */ 5_000,
+                    /* minDurationToRetainAfterDiscardMs = */ 2_000,
+                    /* bandwidthFraction = */ 0.8f,
                 ),
             ).apply {
                 val builder =
@@ -596,6 +604,16 @@ class ShortsPlayerPool private constructor() {
         val slot = ShortsSlotRules.slotFor(index, POOL_SIZE)
         if (!ShortsSlotRules.isOwnedBy(playerOwnerIndices[slot], playerVideoIds[slot], index, videoId)) return null
         return players[slot]
+    }
+
+    /** True while the reel plays Auto's multi-quality manifest, as opposed to one pinned quality. */
+    fun isVideoAdaptive(
+        index: Int,
+        videoId: String,
+    ): Boolean {
+        if (ownedPlayer(index, videoId) == null) return false
+        val manifest = playerVideoManifests[ShortsSlotRules.slotFor(index, POOL_SIZE)] ?: return false
+        return manifest.indexOf(REPRESENTATION_TAG) != manifest.lastIndexOf(REPRESENTATION_TAG)
     }
 
     fun getVideoUrlForIndex(

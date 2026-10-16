@@ -137,6 +137,25 @@ class ShortsStreamResolver internal constructor(
             )
     }
 
+    /**
+     * The "Auto" entry for the quality menu: the same multi-quality manifest Shorts Auto plays, so
+     * choosing it returns a pinned reel to adaptive playback. Null when the reel has no ladder.
+     */
+    suspend fun autoQuality(videoId: String): ShortVideoQuality? {
+        val result = extraction(videoId) ?: return null
+        val codecKey = if (DataSaver.enabled) "vp9" else playerPreferences.videoCodecPriority.first()
+        val resolved = result.toPlaybackStreams(AUTO_ADAPTIVE, "", codecKey) ?: return null
+        val manifest = resolved.videoDashManifest ?: return null
+        if (REPRESENTATION.findAll(manifest).count() < 2) return null
+        return ShortVideoQuality(
+            heightClass = 0,
+            label = "Auto",
+            videoUrl = resolved.videoUrl,
+            codecLabel = "",
+            dashManifest = manifest,
+        )
+    }
+
     /** One entry per audio track, best bitrate of each, the original first. */
     suspend fun availableAudioTracks(videoId: String): List<ShortAudioTrack> {
         val result = extraction(videoId) ?: return emptyList()
@@ -248,6 +267,7 @@ class ShortsStreamResolver internal constructor(
         /** The lowest quality Shorts Auto may use; there is no ceiling above it. */
         const val AUTO_MIN_HEIGHT = 360
         private const val TAG = "ShortsStreamResolver"
+        private val REPRESENTATION = Regex("<Representation ")
         private const val MAX_EXTRACTIONS = 20
         private const val MAX_STREAMS = 50
         private const val EXTRACT_TIMEOUT_MS = 8_000L

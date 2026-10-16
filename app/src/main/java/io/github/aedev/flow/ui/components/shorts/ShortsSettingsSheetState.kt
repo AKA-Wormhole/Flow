@@ -41,6 +41,12 @@ internal class ShortsSettingsSheetState {
     var selectedAudioIndex by mutableIntStateOf(0)
     var selectedQualityUrl by mutableStateOf<String?>(null)
     var selectedQualityHeight by mutableIntStateOf(-1)
+
+    /** The reel is playing Auto's multi-quality manifest rather than one pinned quality. */
+    var isAutoActive by mutableStateOf(false)
+
+    /** The resolution Auto is playing at this moment, e.g. "1080p". */
+    var autoDetail by mutableStateOf<String?>(null)
     var downloadVideo by mutableStateOf<Video?>(null)
     var streamSizes by mutableStateOf<Map<String, Long>>(emptyMap())
     var videoFormats by mutableStateOf<List<PlayerResponse.StreamingData.Format>>(emptyList())
@@ -59,6 +65,8 @@ internal class ShortsSettingsSheetState {
             selectedAudioIndex = 0
             selectedQualityUrl = null
             selectedQualityHeight = -1
+            isAutoActive = false
+            autoDetail = null
         }
         targetIndex = index
         targetId = videoId

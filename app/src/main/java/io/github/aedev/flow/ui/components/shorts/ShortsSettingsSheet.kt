@@ -111,22 +111,44 @@ internal fun ShortsSettingsSheet(
         }
     }
 
+    // What is really playing, not what was asked for: under Auto the manifest's anchor URL is the
+    // top rung, so matching on the URL alone would report the highest quality while Auto may be
+    // on a lower one. Auto is read from the player's live video format instead.
+    fun refreshActiveQuality() {
+        val activeFormat = playerPool.ownedPlayer(pageIndex, short.id)?.videoFormat
+        val isAuto = playerPool.isVideoAdaptive(pageIndex, short.id)
+        state.isAutoActive = isAuto
+        state.autoDetail =
+            listOf(activeFormat?.width ?: 0, activeFormat?.height ?: 0)
+                .filter { it > 0 }
+                .minOrNull()
+                ?.let(VideoCodecUtils::normalizeQualityHeight)
+                ?.takeIf { it > 0 }
+                ?.let { "${it}p" }
+        if (isAuto) {
+            state.selectedQualityHeight = 0
+            state.selectedQualityUrl = null
+            return
+        }
+        val active =
+            findActiveShortQuality(
+                qualities = state.availableQualities.filter { it.heightClass != 0 },
+                currentVideoUrl = playerPool.getVideoUrlForIndex(pageIndex, short.id),
+                activeVideoWidth = activeFormat?.width ?: 0,
+                activeVideoHeight = activeFormat?.height ?: 0,
+                activeCodecKey = activeFormat?.let { VideoCodecUtils.codecKeyFromMimeType(it.fullMimeType()) },
+            )
+        state.selectedQualityHeight = active?.heightClass ?: -1
+        state.selectedQualityUrl = active?.videoUrl
+    }
+
     fun openQuality() {
         state.page = ShortsSettingsPage.Quality
+        refreshActiveQuality()
         if (state.availableQualities.isNotEmpty()) return
         withStreams {
             state.availableQualities = viewModel.availableQualities(short.id)
-            val activeFormat = playerPool.ownedPlayer(pageIndex, short.id)?.videoFormat
-            val active =
-                findActiveShortQuality(
-                    qualities = state.availableQualities,
-                    currentVideoUrl = playerPool.getVideoUrlForIndex(pageIndex, short.id),
-                    activeVideoWidth = activeFormat?.width ?: 0,
-                    activeVideoHeight = activeFormat?.height ?: 0,
-                    activeCodecKey = activeFormat?.let { VideoCodecUtils.codecKeyFromMimeType(it.fullMimeType()) },
-                )
-            state.selectedQualityHeight = active?.heightClass ?: -1
-            state.selectedQualityUrl = active?.videoUrl
+            refreshActiveQuality()
         }
     }
 
@@ -196,8 +218,10 @@ internal fun ShortsSettingsSheet(
                         groupedByResolution = settings.groupedQualitySelectorEnabled,
                         onQualitySelected = { quality ->
                             playerPool.reloadWithVideoUrl(pageIndex, short.id, quality.videoUrl, quality.dashManifest)
+                            val auto = quality.heightClass == 0
+                            state.isAutoActive = auto
                             state.selectedQualityHeight = quality.heightClass
-                            state.selectedQualityUrl = quality.videoUrl
+                            state.selectedQualityUrl = if (auto) null else quality.videoUrl
                             sheetState.dismiss()
                         },
                     )
@@ -337,13 +361,20 @@ private fun ShortsQualityPage(
     }
     val qualities = state.availableQualities
     val options = remember(qualities) { qualities.map(ShortVideoQuality::toQualityOption) }
-    val selectedKey = state.selectedQualityUrl ?: qualities.firstOrNull { it.heightClass == state.selectedQualityHeight }?.videoUrl
+    val selectedKey =
+        if (state.isAutoActive) {
+            null
+        } else {
+            state.selectedQualityUrl
+                ?: qualities.firstOrNull { it.heightClass != 0 && it.heightClass == state.selectedQualityHeight }?.videoUrl
+        }
     PlayerSettingsQualityPage(
         availableQualities = options,
-        currentQuality = -1,
+        currentQuality = if (state.isAutoActive) 0 else -1,
         currentQualityKey = selectedKey,
         useGroupedQualitySelector = groupedByResolution,
-        onQualitySelected = { option -> qualities.firstOrNull { it.videoUrl == option.streamKey }?.let(onQualitySelected) },
+        onQualitySelected = { option -> qualities.firstOrNull { it.selectionKey() == option.streamKey }?.let(onQualitySelected) },
+        autoDetail = state.autoDetail.takeIf { state.isAutoActive },
     )
 }
 

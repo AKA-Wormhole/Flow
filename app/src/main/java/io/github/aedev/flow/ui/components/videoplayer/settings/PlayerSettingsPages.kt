@@ -37,6 +37,8 @@ internal fun PlayerSettingsQualityPage(
     currentQualityKey: String?,
     useGroupedQualitySelector: Boolean,
     onQualitySelected: (QualityOption) -> Unit,
+    /** What Auto is playing right now, e.g. "1080p"; shown beside the Auto row. */
+    autoDetail: String? = null,
 ) {
     val autoLabel = stringResource(R.string.quality_auto)
     val selectorOptions =
@@ -44,7 +46,12 @@ internal fun PlayerSettingsQualityPage(
             MediaQualitySelectorOption(
                 item = quality,
                 height = quality.height,
-                label = if (quality.height == 0) autoLabel else quality.displayLabel(),
+                label =
+                    if (quality.height == 0) {
+                        autoDetail?.let { "$autoLabel ($it)" } ?: autoLabel
+                    } else {
+                        quality.displayLabel()
+                    },
                 codecKey = quality.codecKey,
                 codecLabel =
                     quality.codecKey

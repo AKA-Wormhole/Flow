@@ -303,11 +303,16 @@ class ShortsViewModel
             return resolved
         }
 
-        suspend fun availableQualities(videoId: String): List<ShortVideoQuality> =
-            streams.availableQualities(videoId).let { all ->
-                // Never hand back an empty menu: if nothing is at or under the cap, show what exists.
-                all.filter { !DataSaver.enabled || it.heightClass <= DataSaver.MAX_VIDEO_HEIGHT }.ifEmpty { all }
-            }
+        suspend fun availableQualities(videoId: String): List<ShortVideoQuality> {
+            val fixed =
+                streams.availableQualities(videoId).let { all ->
+                    // Never hand back an empty menu: if nothing is at or under the cap, show what exists.
+                    all.filter { !DataSaver.enabled || it.heightClass <= DataSaver.MAX_VIDEO_HEIGHT }.ifEmpty { all }
+                }
+            if (fixed.isEmpty()) return fixed
+            // Auto leads the menu, like the main player's, so a pinned reel can go back to adaptive.
+            return listOfNotNull(streams.autoQuality(videoId)) + fixed
+        }
 
         suspend fun availableAudioTracks(videoId: String): List<ShortAudioTrack> = streams.availableAudioTracks(videoId)
 

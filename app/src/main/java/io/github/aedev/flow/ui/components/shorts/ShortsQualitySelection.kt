@@ -37,5 +37,10 @@ internal fun ShortVideoQuality.toQualityOption(): QualityOption =
         label = listOf(label, codecLabel).filter(String::isNotBlank).joinToString(" "),
         bitrate = 0L,
         codecKey = codecKey,
-        streamKey = videoUrl,
+        streamKey = selectionKey(),
     )
+
+/** Auto shares its anchor's URL with the top fixed quality, so it needs a key of its own. */
+internal fun ShortVideoQuality.selectionKey(): String = if (heightClass == 0) AUTO_SELECTION_KEY else videoUrl
+
+private const val AUTO_SELECTION_KEY = "shorts:auto"
