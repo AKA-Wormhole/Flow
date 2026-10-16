@@ -49,5 +49,10 @@ fun NavController.openSound(
     params: String,
     title: String,
 ) {
+    val previous = previousBackStackEntry
+    if (previous?.destination?.route == SOUND_ROUTE_PATTERN && previous.arguments?.getString("id") == browseId) {
+        popBackStack()
+        return
+    }
     navigate("sound/${Uri.encode(browseId)}?params=${Uri.encode(params)}&title=${Uri.encode(title)}")
 }
