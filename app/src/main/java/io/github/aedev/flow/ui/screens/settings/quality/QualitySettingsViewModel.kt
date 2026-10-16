@@ -6,6 +6,7 @@ import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.ThumbnailQuality
 import io.github.aedev.flow.data.local.VideoCodec
 import io.github.aedev.flow.data.local.VideoQuality
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.ui.screens.settings.SettingsViewModel
 import javax.inject.Inject
 
@@ -20,6 +21,8 @@ class QualitySettingsViewModel
         val shortsWifi = preferences.shortsQualityWifi.asState(VideoQuality.Q_720P)
         val shortsMobile = preferences.shortsQualityCellular.asState(VideoQuality.Q_480P)
         val dataSaver = preferences.dataSaverEnabled.asState(false)
+        val autoFloor = preferences.autoQualityFloor.asState(AutoQualityBounds.NONE)
+        val autoCeiling = preferences.autoQualityCeiling.asState(AutoQualityBounds.NONE)
         val music = preferences.musicAudioQuality.asState(MusicAudioQuality.AUTO)
         val thumbnailsWifi = preferences.thumbnailQualityWifi.asState(ThumbnailQuality.HIGH)
         val thumbnailsMobile = preferences.thumbnailQualityCellular.asState(ThumbnailQuality.HIGH)
@@ -27,6 +30,10 @@ class QualitySettingsViewModel
         val fallbackCodec = preferences.fallbackVideoCodec.asState(VideoCodec.AUTO)
 
         fun setDataSaver(enabled: Boolean) = write { preferences.setDataSaverEnabled(enabled) }
+
+        fun setAutoFloor(height: Int) = write { preferences.setAutoQualityFloor(height) }
+
+        fun setAutoCeiling(height: Int) = write { preferences.setAutoQualityCeiling(height) }
 
         fun setVideoWifi(value: VideoQuality) = write { preferences.setDefaultQualityWifi(value) }
 

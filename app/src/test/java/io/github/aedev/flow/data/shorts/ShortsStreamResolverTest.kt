@@ -1,6 +1,7 @@
 package io.github.aedev.flow.data.shorts
 
 import io.github.aedev.flow.data.local.PlayerPreferences
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.player.stream.InnerTubeVideoStreamExtractor.VideoExtractionResult
 import io.mockk.every
 import io.mockk.mockk
@@ -127,5 +128,38 @@ class ShortsStreamResolverTest {
             assertNull(resolver.resolve("reel1234567", targetHeight = 720, preferredAudioLanguage = ""))
             assertTrue(resolver.availableQualities("reel1234567").isEmpty())
             assertEquals(2, extractions.get())
+        }
+
+    @Test
+    fun `Auto plays the best quality by default, held under a ceiling and over a floor the viewer set`() =
+        runBlocking {
+            val auto = ShortsStreamResolver.AUTO_ADAPTIVE
+            try {
+                assertTrue(resolver.resolve("reel1234567", auto, "")!!.videoUrl.contains("itag=248"))
+
+                AutoQualityBounds.ceiling = 720
+                assertTrue(resolver.resolve("reel1234567", auto, "")!!.videoUrl.contains("itag=398"))
+
+                AutoQualityBounds.ceiling = 480
+                assertTrue(resolver.resolve("reel1234567", auto, "")!!.videoUrl.contains("itag=780"))
+
+                AutoQualityBounds.ceiling = AutoQualityBounds.NONE
+                AutoQualityBounds.floor = 1080
+                assertTrue(resolver.resolve("reel1234567", auto, "")!!.videoUrl.contains("itag=248"))
+            } finally {
+                AutoQualityBounds.floor = AutoQualityBounds.NONE
+                AutoQualityBounds.ceiling = AutoQualityBounds.NONE
+            }
+        }
+
+    @Test
+    fun `a fixed quality ignores the Auto ceiling`() =
+        runBlocking {
+            try {
+                AutoQualityBounds.ceiling = 480
+                assertTrue(resolver.resolve("reel1234567", targetHeight = 720, preferredAudioLanguage = "")!!.videoUrl.contains("itag=398"))
+            } finally {
+                AutoQualityBounds.ceiling = AutoQualityBounds.NONE
+            }
         }
 }

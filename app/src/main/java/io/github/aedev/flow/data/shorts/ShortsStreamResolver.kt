@@ -2,6 +2,7 @@ package io.github.aedev.flow.data.shorts
 
 import android.util.Log
 import io.github.aedev.flow.data.local.DataSaver
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.innertube.models.response.PlayerResponse
 import io.github.aedev.flow.player.shorts.ShortsStartupTrace
@@ -92,7 +93,8 @@ class ShortsStreamResolver internal constructor(
         ShortsStartupTrace.onRequested(videoId)
         // Data Saver prefers VP9 (smaller for the same picture); the other codecs stay as the fallback.
         val codecKey = if (DataSaver.enabled) "vp9" else playerPreferences.videoCodecPriority.first()
-        val key = "$videoId|$targetHeight|$preferredAudioLanguage|$codecKey|${DataSaver.enabled}"
+        // Auto's floor and ceiling shape the manifest, so they are part of what a cached entry was made for.
+        val key = "$videoId|$targetHeight|$preferredAudioLanguage|$codecKey|${DataSaver.enabled}|${AutoQualityBounds.current().cacheKey}"
         cached(streams, key)?.let {
             ShortsStartupTrace.onStreamsResolved(videoId, cached = true, strategy = "cache")
             return it
@@ -226,13 +228,9 @@ class ShortsStreamResolver internal constructor(
     ): ShortPlaybackStreams? {
         val videoFormats = playableVideoFormats()
         val adaptive = targetHeight == AUTO_ADAPTIVE
-        // Auto never goes below 360p, with no ceiling above it.
-        val autoMax = if (DataSaver.enabled) DataSaver.MAX_VIDEO_HEIGHT else Int.MAX_VALUE
-        val autoFormats =
-            videoFormats
-                .filter { shortsQualityClass(it) in AUTO_MIN_HEIGHT..autoMax }
-                .ifEmpty { videoFormats.filter { shortsQualityClass(it) >= AUTO_MIN_HEIGHT } }
-                .ifEmpty { videoFormats }
+        // Auto stays between the viewer's floor and ceiling (480p up and no ceiling unless they set
+        // them, and Data Saver caps it at 720p), as far as the reel has such qualities.
+        val autoFormats = AutoQualityBounds.current().restrict(videoFormats, ::shortsQualityClass)
         val video =
             selectShortVideoFormat(if (adaptive) autoFormats else videoFormats, if (adaptive) 0 else targetHeight, codecKey)
                 ?: return null
@@ -264,8 +262,6 @@ class ShortsStreamResolver internal constructor(
         /** Target height meaning Auto: one multi-quality manifest that Media3 adapts over. */
         const val AUTO_ADAPTIVE = -1
 
-        /** The lowest quality Shorts Auto may use; there is no ceiling above it. */
-        const val AUTO_MIN_HEIGHT = 360
         private const val TAG = "ShortsStreamResolver"
         private val REPRESENTATION = Regex("<Representation ")
         private const val MAX_EXTRACTIONS = 20

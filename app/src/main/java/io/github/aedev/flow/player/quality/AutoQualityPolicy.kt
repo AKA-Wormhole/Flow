@@ -5,8 +5,8 @@ import org.schabi.newpipe.extractor.stream.VideoStream
 
 /**
  * Auto's rules for picking a stream. The height comes from [AutoQualityLadder], which maps the
- * connection speed to a quality; this picks the stream at that height (or the nearest below it) in
- * the best-ranked codec.
+ * connection speed to a quality, held to the viewer's floor and ceiling; this picks the stream at
+ * that height (or the nearest below it) in the best-ranked codec.
  */
 internal object AutoQualityPolicy {
     /** The stream at the height the ladder names for [estimateBps]. */
@@ -68,11 +68,16 @@ internal object AutoQualityPolicy {
             )
     }
 
+    /** One step lower after buffering, never under a floor the viewer set. */
     fun stepDown(
         current: VideoStream,
         streams: List<VideoStream>,
         preferredCodec: String?,
-    ): VideoStream? = neighbour(current, streams, preferredCodec, nearestFirst = false) { height(it) < height(current) }
+        range: AutoQualityRange = AutoQualityBounds.current(),
+    ): VideoStream? =
+        neighbour(current, streams, preferredCodec, nearestFirst = false) {
+            height(it) < height(current) && height(it) >= range.userFloor
+        }
 
     private fun neighbour(
         current: VideoStream,

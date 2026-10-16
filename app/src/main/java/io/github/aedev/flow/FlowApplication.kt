@@ -11,6 +11,7 @@ import dagger.hilt.android.HiltAndroidApp
 import io.github.aedev.flow.account.AccountManager
 import io.github.aedev.flow.data.local.CONTENT_LANGUAGE_FOLLOW_APP
 import io.github.aedev.flow.data.local.DataSaver
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.data.local.PlayerPreferences
 import io.github.aedev.flow.data.local.SubscriptionRepository
 import io.github.aedev.flow.data.repository.NewPipeDownloader
@@ -108,6 +109,14 @@ class FlowApplication :
         // Keeps Data Saver readable from code that cannot suspend, such as the track selector's size cap.
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             playerPreferences.dataSaverEnabled.collect { DataSaver.enabled = it }
+        }
+
+        // Same for Auto's quality floor and ceiling, which the stream pickers read without suspending.
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            playerPreferences.autoQualityFloor.collect { AutoQualityBounds.floor = it }
+        }
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            playerPreferences.autoQualityCeiling.collect { AutoQualityBounds.ceiling = it }
         }
 
         // Keeps the media caches inside their size settings: applies the stored limits shortly after

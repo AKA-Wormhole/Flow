@@ -12,10 +12,15 @@ import org.schabi.newpipe.extractor.stream.VideoStream
 internal object AdaptiveLadder {
     private const val MIN_RUNGS = 2
 
-    /** Empty when fewer than two qualities qualify, which leaves Auto on a single stream. */
+    /**
+     * Empty when fewer than two qualities qualify, which leaves Auto on a single stream. Only
+     * qualities inside the viewer's Auto floor and ceiling are offered, so Media3 cannot adapt out of
+     * them between Auto's own checks.
+     */
     fun rungs(
         anchor: VideoStream?,
         streams: List<VideoStream>,
+        range: AutoQualityRange = AutoQualityBounds.current(),
     ): List<VideoStream> {
         anchor ?: return emptyList()
         val codec = VideoCodecUtils.codecKeyFromStream(anchor)
@@ -29,6 +34,7 @@ internal object AdaptiveLadder {
             }.groupBy(VideoCodecUtils::qualityHeightFromStream)
             .values
             .map { sameHeight -> sameHeight.maxBy { it.bitrate } }
+            .let { range.forLadder().restrict(it) { stream -> VideoCodecUtils.qualityHeightFromStream(stream) } }
             .sortedBy { it.bitrate }
             .takeIf { it.size >= MIN_RUNGS }
             .orEmpty()

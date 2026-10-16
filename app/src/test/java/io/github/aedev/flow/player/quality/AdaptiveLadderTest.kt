@@ -57,4 +57,26 @@ class AdaptiveLadderTest {
         val rungs = AdaptiveLadder.forPreload(null, streams, "vp9")
         assertThat(rungs.map(VideoCodecUtils::codecKeyFromStream).distinct()).containsExactly("vp9")
     }
+
+    @Test
+    fun `a ladder keeps to the Auto floor and ceiling`() {
+        val anchor = h264(720, 2_500_000)
+        val streams = listOf(h264(1080, 4_500_000), anchor, h264(480, 1_200_000), h264(360, 700_000))
+
+        val range = AutoQualityBounds.resolve(userFloor = 0, userCeiling = 720, dataSaver = false)
+        assertThat(heights(AdaptiveLadder.rungs(anchor, streams, range))).containsExactly(360, 480, 720).inOrder()
+
+        val banded = AutoQualityBounds.resolve(userFloor = 720, userCeiling = 1080, dataSaver = false)
+        assertThat(heights(AdaptiveLadder.rungs(anchor, streams, banded))).containsExactly(720, 1080).inOrder()
+    }
+
+    @Test
+    fun `a band holding one quality leaves Auto on a single stream`() {
+        val anchor = h264(720, 2_500_000)
+        val streams = listOf(h264(1080, 4_500_000), anchor, h264(360, 700_000))
+
+        val range = AutoQualityBounds.resolve(userFloor = 1080, userCeiling = 1080, dataSaver = false)
+
+        assertThat(AdaptiveLadder.rungs(anchor, streams, range)).isEmpty()
+    }
 }

@@ -40,6 +40,8 @@ private enum class QualityPicker {
     VIDEO_MOBILE,
     SHORTS_WIFI,
     SHORTS_MOBILE,
+    AUTO_FLOOR,
+    AUTO_CEILING,
     CODEC,
     FALLBACK_CODEC,
     THUMBNAILS_WIFI,
@@ -60,6 +62,8 @@ internal fun QualitySettingsScreen(
     val shortsMobile by viewModel.shortsMobile.collectAsStateWithLifecycle()
     val music by viewModel.music.collectAsStateWithLifecycle()
     val dataSaver by viewModel.dataSaver.collectAsStateWithLifecycle()
+    val autoFloor by viewModel.autoFloor.collectAsStateWithLifecycle()
+    val autoCeiling by viewModel.autoCeiling.collectAsStateWithLifecycle()
     val codec by viewModel.codec.collectAsStateWithLifecycle()
     val fallbackCodec by viewModel.fallbackCodec.collectAsStateWithLifecycle()
     val thumbnailsWifi by viewModel.thumbnailsWifi.collectAsStateWithLifecycle()
@@ -77,6 +81,8 @@ internal fun QualitySettingsScreen(
     val videoMobileLabel = stringResource(videoQualityLabel(videoMobile))
     val shortsWifiLabel = stringResource(videoQualityLabel(shortsWifi))
     val shortsMobileLabel = stringResource(videoQualityLabel(shortsMobile))
+    val autoFloorLabel = stringResource(autoFloorLabelRes(autoFloor))
+    val autoCeilingLabel = stringResource(autoCeilingLabelRes(autoCeiling))
     val codecLabel = codecLabel(codec)
     val fallbackLabel = codecLabel(fallbackCodec)
     val thumbnailsWifiLabel = stringResource(thumbnailQualityLabel(thumbnailsWifi))
@@ -101,6 +107,11 @@ internal fun QualitySettingsScreen(
             switch(QualityIndex.dataSaver, dataSaver, { on -> viewModel.setDataSaver(on) }, icon = Icons.Outlined.DataUsage)
         }
         notice("quality.data_saver.notice", text = { stringResource(R.string.data_saver_notice) })
+        group(key = "quality.auto", header = R.string.settings_section_auto_quality) {
+            nav(QualityIndex.autoFloor, value = autoFloorLabel, showChevron = false, onClick = { picker = QualityPicker.AUTO_FLOOR })
+            nav(QualityIndex.autoCeiling, value = autoCeilingLabel, showChevron = false, onClick = { picker = QualityPicker.AUTO_CEILING })
+        }
+        notice("quality.auto.notice", text = { stringResource(R.string.auto_quality_notice) }, icon = Icons.Outlined.DataUsage)
         when (selectedTab) {
             SettingsTabs.QUALITY_SHORTS -> {
                 group(key = "quality.shorts.resolution", header = R.string.settings_section_resolution) {
@@ -183,6 +194,8 @@ internal fun QualitySettingsScreen(
                     fallbackCodec,
                     thumbnailsWifi,
                     thumbnailsMobile,
+                    autoFloor,
+                    autoCeiling,
                 ),
             viewModel = viewModel,
             onDismiss = { picker = null },
@@ -199,6 +212,8 @@ private data class QualityPickerState(
     val fallbackCodec: VideoCodec,
     val thumbnailsWifi: ThumbnailQuality,
     val thumbnailsMobile: ThumbnailQuality,
+    val autoFloor: Int,
+    val autoCeiling: Int,
 )
 
 @Composable
@@ -253,6 +268,30 @@ private fun QualityPickerDialog(
 
         QualityPicker.SHORTS_MOBILE -> {
             resolution(R.string.settings_quality_mobile, VideoQualities, state.shortsMobile, viewModel::setShortsMobile)
+        }
+
+        QualityPicker.AUTO_FLOOR -> {
+            FlowChoiceDialog(
+                title = stringResource(R.string.auto_quality_floor_title),
+                description = stringResource(R.string.auto_quality_floor_dialog_body),
+                options =
+                    autoFloorChoices(state.autoCeiling, state.autoFloor).map { FlowChoice(it, stringResource(autoFloorLabelRes(it))) },
+                selected = state.autoFloor,
+                onSelect = viewModel::setAutoFloor,
+                onDismiss = onDismiss,
+            )
+        }
+
+        QualityPicker.AUTO_CEILING -> {
+            FlowChoiceDialog(
+                title = stringResource(R.string.auto_quality_ceiling_title),
+                description = stringResource(R.string.auto_quality_ceiling_dialog_body),
+                options =
+                    autoCeilingChoices(state.autoFloor, state.autoCeiling).map { FlowChoice(it, stringResource(autoCeilingLabelRes(it))) },
+                selected = state.autoCeiling,
+                onSelect = viewModel::setAutoCeiling,
+                onDismiss = onDismiss,
+            )
         }
 
         QualityPicker.THUMBNAILS_WIFI -> {

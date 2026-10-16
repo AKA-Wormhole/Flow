@@ -11,6 +11,17 @@ data class VideoSizeCap(
     val maxWidth: Int,
     val maxHeight: Int,
 ) {
+    /**
+     * This cap lowered so that nothing taller than [ceilingHeight]p fits. Both sides stay within a
+     * 16:9 frame's long side, so the limit holds upright or sideways, as Data Saver's does. A cap
+     * already below that is left as it is, and [Int.MAX_VALUE] means no ceiling.
+     */
+    fun withCeiling(ceilingHeight: Int): VideoSizeCap {
+        if (ceilingHeight >= maxHeight) return this
+        val longSide = (ceilingHeight.toLong() * 16 / 9).toInt()
+        return VideoSizeCap(maxWidth = minOf(maxWidth, longSide), maxHeight = minOf(maxHeight, longSide))
+    }
+
     companion object {
         val UHD = VideoSizeCap(PlayerConfig.MAX_VIDEO_WIDTH, PlayerConfig.MAX_VIDEO_HEIGHT)
 

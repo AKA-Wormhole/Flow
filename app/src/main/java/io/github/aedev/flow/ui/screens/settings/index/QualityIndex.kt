@@ -72,8 +72,24 @@ internal object QualityIndex {
             R.string.settings_section_data_saver,
             keywords = R.string.settings_keywords_data_saver,
         ).copy(summary = R.string.data_saver_summary)
+    val autoFloor =
+        entry(
+            "auto.floor",
+            R.string.auto_quality_floor_title,
+            SettingsTabs.QUALITY_VIDEO,
+            R.string.settings_section_auto_quality,
+            keywords = R.string.settings_keywords_auto_quality,
+        ).copy(summary = R.string.auto_quality_floor_summary)
+    val autoCeiling =
+        entry(
+            "auto.ceiling",
+            R.string.auto_quality_ceiling_title,
+            SettingsTabs.QUALITY_VIDEO,
+            R.string.settings_section_auto_quality,
+            keywords = R.string.settings_keywords_auto_quality,
+        ).copy(summary = R.string.auto_quality_ceiling_summary)
     val music = entry("music", R.string.music_quality_header, SettingsTabs.QUALITY_MUSIC, R.string.settings_quality_tab_music)
 
     val all =
-        listOf(dataSaver, videoWifi, videoMobile, codec, fallbackCodec, thumbnailsWifi, thumbnailsMobile, shortsWifi, shortsMobile, music)
+        listOf(dataSaver, autoFloor, autoCeiling, videoWifi, videoMobile, codec, fallbackCodec, thumbnailsWifi, thumbnailsMobile, shortsWifi, shortsMobile, music)
 }

@@ -1449,6 +1449,17 @@
     <string name="data_saver_title">Data saver</string>
     <string name="data_saver_summary">Use less data on videos, Shorts, music and thumbnails</string>
     <string name="data_saver_notice">Videos and Shorts play at 720p at most (Auto stays available), thumbnails are smaller and music streams at medium quality. Your quality choices below are kept and apply again when this is off. Changes reach a video that is already playing when you open the next one.</string>
+    <string name="settings_section_auto_quality">Auto quality</string>
+    <string name="auto_quality_floor_title">Quality floor</string>
+    <string name="auto_quality_floor_summary">Auto never plays below this</string>
+    <string name="auto_quality_floor_off">Off (480p)</string>
+    <string name="auto_quality_floor_dialog_body">Auto picks a quality from your connection speed and never goes under 480p. Raise the floor to keep Auto sharper, at the cost of more data and more buffering on a slow connection.</string>
+    <string name="auto_quality_ceiling_title">Quality ceiling</string>
+    <string name="auto_quality_ceiling_summary">Auto never plays above this</string>
+    <string name="auto_quality_ceiling_off">No limit</string>
+    <string name="auto_quality_ceiling_dialog_body">Auto picks a quality from your connection speed. Set a ceiling to keep it from using more data than you want, even on a fast connection.</string>
+    <string name="auto_quality_notice">The floor and ceiling apply to Auto on videos and Shorts. A quality you pick by hand is played as picked. Data Saver\'s 720p limit still applies, and a floor above it gives way. If a video lacks a quality inside the range, it plays the nearest one. Changes reach a video that is already playing when you open the next one.</string>
+    <string name="settings_keywords_auto_quality">minimum quality, maximum quality, lowest quality, highest quality, limit resolution, cap resolution, auto resolution, min, max</string>
     <string name="settings_keywords_data_saver">data saver, data usage, low data, save data, mobile data, bandwidth, reduce data</string>
     <string name="video_quality_warning">Higher quality uses more data</string>
     <string name="video_quality_wifi_header">Wi-Fi Quality</string>

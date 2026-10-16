@@ -1,7 +1,5 @@
 package io.github.aedev.flow.player.quality
 
-import io.github.aedev.flow.data.local.DataSaver
-
 /**
  * Auto's quality for a connection speed, the same on Wi-Fi and mobile data and for videos and Shorts.
  * Speeds are in kilobytes per second (KB/s), the unit speed meters show; 100 KB/s is about 0.8 Mbps:
@@ -12,8 +10,9 @@ import io.github.aedev.flow.data.local.DataSaver
  * - 660 to 1100 KB/s: 1440p
  * - 1100 KB/s and up: 2160p
  *
- * Data Saver caps the result at 720p. A video that does not have the named height plays at the
- * nearest height below it.
+ * The result is then held to the viewer's Auto floor and ceiling ([AutoQualityBounds]); Data Saver
+ * also caps it at 720p. A video that does not have the named height plays at the nearest height
+ * below it.
  */
 object AutoQualityLadder {
     private const val BITS_PER_KILOBYTE = 8_000L
@@ -22,12 +21,16 @@ object AutoQualityLadder {
     private const val UP_TO_1080P_KB_PER_S = 660L
     private const val UP_TO_1440P_KB_PER_S = 1100L
 
-    /** The tallest height Auto may use right now: unlimited, or 720p while Data Saver is on. */
-    fun currentMaxHeight(): Int = if (DataSaver.enabled) DataSaver.MAX_VIDEO_HEIGHT else Int.MAX_VALUE
+    /** The tallest height Auto may use right now: the viewer's ceiling and Data Saver's 720p, whichever is lower. */
+    fun currentMaxHeight(): Int = AutoQualityBounds.current().ceiling
+
+    /** The shortest height Auto may use right now: 480p unless the viewer raised it. */
+    fun currentMinHeight(): Int = AutoQualityBounds.current().floor
 
     fun targetHeight(
         estimateBps: Long,
         maxHeight: Int = currentMaxHeight(),
+        minHeight: Int = currentMinHeight(),
     ): Int {
         val kiloBytesPerSecond = estimateBps / BITS_PER_KILOBYTE
         val height =
@@ -38,7 +41,7 @@ object AutoQualityLadder {
                 kiloBytesPerSecond < UP_TO_1440P_KB_PER_S -> 1440
                 else -> 2160
             }
-        return minOf(height, maxHeight)
+        return height.coerceIn(minOf(minHeight, maxHeight), maxHeight)
     }
 
     /**
@@ -49,6 +52,7 @@ object AutoQualityLadder {
     @Volatile
     var shortsEstimateBps: Long = 0L
 
-    /** The height a Short set to Auto plays at. With no measured speed yet it starts at the lowest, 480p. */
-    fun shortsHeight(): Int = if (shortsEstimateBps <= 0L) minOf(480, currentMaxHeight()) else targetHeight(shortsEstimateBps)
+    /** The height a Short set to Auto plays at; before a speed is measured, the lowest Auto allows (480p unless raised). */
+    fun shortsHeight(): Int =
+        if (shortsEstimateBps <= 0L) currentMinHeight().coerceAtMost(currentMaxHeight()) else targetHeight(shortsEstimateBps)
 }

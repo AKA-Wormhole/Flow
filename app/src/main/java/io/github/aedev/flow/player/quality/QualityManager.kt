@@ -468,7 +468,9 @@ class QualityManager(
      */
     fun applyAdaptiveTrackSelectorDefaults() {
         trackSelector?.let { selector ->
-            selector.setParameters(adaptiveTrackSelectorDefaults(selector.buildUponParameters(), videoSizeCap).build())
+            // The viewer's ceiling (and Data Saver's) bounds what Media3 may pick before Auto's own checks run.
+            val cap = videoSizeCap.withCeiling(AutoQualityBounds.current().ceiling)
+            selector.setParameters(adaptiveTrackSelectorDefaults(selector.buildUponParameters(), cap).build())
         }
     }
 

@@ -11,6 +11,7 @@ import io.github.aedev.flow.data.video.downloader.work.RetagResult
 import io.github.aedev.flow.data.video.storage.DownloadLocation
 import io.github.aedev.flow.network.AppProxyConfig
 import io.github.aedev.flow.network.AppProxyType
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.player.stream.CaptionTrackResolver
 import io.github.aedev.flow.ui.components.videoplayer.subtitle.SubtitleEdgeType
 import io.github.aedev.flow.ui.components.videoplayer.subtitle.SubtitleStyle
@@ -69,6 +70,8 @@ class PlayerPreferences(
         val FALLBACK_VIDEO_CODEC = stringPreferencesKey("fallback_video_codec")
         val BACKGROUND_PLAY_ENABLED = booleanPreferencesKey("background_play_enabled")
         val DATA_SAVER_ENABLED = booleanPreferencesKey("data_saver_enabled")
+        val AUTO_QUALITY_FLOOR = intPreferencesKey("auto_quality_floor")
+        val AUTO_QUALITY_CEILING = intPreferencesKey("auto_quality_ceiling")
         val AUTOPLAY_ENABLED = booleanPreferencesKey("autoplay_enabled")
         val QUEUE_AUTOPLAY_ENABLED = booleanPreferencesKey("queue_autoplay_enabled")
         val START_VIDEOS_PAUSED = booleanPreferencesKey("start_videos_paused")
@@ -1493,6 +1496,29 @@ class PlayerPreferences(
         DataSaver.enabled = enabled
         context.playerPreferencesDataStore.edit { preferences ->
             preferences[Keys.DATA_SAVER_ENABLED] = enabled
+        }
+    }
+
+    // Auto's quality floor and ceiling, in pixels of height; 0 means none is set. They shape Auto only.
+    val autoQualityFloor: Flow<Int> =
+        context.playerPreferencesDataStore.data
+            .map { preferences -> preferences[Keys.AUTO_QUALITY_FLOOR] ?: AutoQualityBounds.NONE }
+
+    val autoQualityCeiling: Flow<Int> =
+        context.playerPreferencesDataStore.data
+            .map { preferences -> preferences[Keys.AUTO_QUALITY_CEILING] ?: AutoQualityBounds.NONE }
+
+    suspend fun setAutoQualityFloor(height: Int) {
+        AutoQualityBounds.floor = height
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.AUTO_QUALITY_FLOOR] = height
+        }
+    }
+
+    suspend fun setAutoQualityCeiling(height: Int) {
+        AutoQualityBounds.ceiling = height
+        context.playerPreferencesDataStore.edit { preferences ->
+            preferences[Keys.AUTO_QUALITY_CEILING] = height
         }
     }
 

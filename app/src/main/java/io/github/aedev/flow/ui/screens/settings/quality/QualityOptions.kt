@@ -8,6 +8,7 @@ import io.github.aedev.flow.data.local.MusicAudioQuality
 import io.github.aedev.flow.data.local.ThumbnailQuality
 import io.github.aedev.flow.data.local.VideoCodec
 import io.github.aedev.flow.data.local.VideoQuality
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 
 /** Resolutions offered for regular video and Shorts, best first. */
 internal val VideoQualities =
@@ -22,6 +23,57 @@ internal val VideoQualities =
         VideoQuality.Q_240P,
         VideoQuality.Q_144P,
     )
+
+/** Heights a quality ceiling can be set to, best first. */
+private val AutoCeilingHeights = listOf(2160, 1440, 1080, 720, 480, 360, 240, 144)
+
+/**
+ * Heights a quality floor can be set to, best first. Auto never goes under 480p on its own, so a
+ * floor at or under it would change nothing and is not offered.
+ */
+private val AutoFloorHeights = listOf(2160, 1440, 1080, 720)
+
+/**
+ * The floors on offer given the ceiling in force ([AutoQualityBounds.NONE] when there is none): the
+ * off choice, then every height up to the ceiling. The current choice stays listed even if a
+ * lowered ceiling has put it out of range, so the dialog never opens with nothing selected.
+ */
+internal fun autoFloorChoices(
+    ceiling: Int,
+    current: Int,
+): List<Int> =
+    listOf(AutoQualityBounds.NONE) +
+        AutoFloorHeights.filter { (ceiling == AutoQualityBounds.NONE || it <= ceiling) || it == current }
+
+/** The ceilings on offer given the floor in force: no limit, then every height from the floor up. */
+internal fun autoCeilingChoices(
+    floor: Int,
+    current: Int,
+): List<Int> =
+    listOf(AutoQualityBounds.NONE) +
+        AutoCeilingHeights.filter { (floor == AutoQualityBounds.NONE || it >= floor) || it == current }
+
+@StringRes
+internal fun autoFloorLabelRes(height: Int): Int =
+    if (height == AutoQualityBounds.NONE) R.string.auto_quality_floor_off else autoQualityHeightLabel(height)
+
+@StringRes
+internal fun autoCeilingLabelRes(height: Int): Int =
+    if (height == AutoQualityBounds.NONE) R.string.auto_quality_ceiling_off else autoQualityHeightLabel(height)
+
+@StringRes
+internal fun autoQualityHeightLabel(height: Int): Int =
+    when (height) {
+        2160 -> R.string.quality_2160p_4k
+        1440 -> R.string.quality_1440p_qhd
+        1080 -> R.string.quality_1080p_full_hd
+        720 -> R.string.quality_720p_hd
+        480 -> R.string.quality_480p
+        360 -> R.string.quality_360p
+        240 -> R.string.quality_240p
+        144 -> R.string.quality_144p
+        else -> R.string.quality_auto
+    }
 
 internal val MusicQualities = MusicAudioQuality.entries.toList()
 

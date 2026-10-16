@@ -46,4 +46,37 @@ class AutoQualityLadderTest {
         assertEquals(720, AutoQualityLadder.targetHeight(kBps(50_000), 720))
         assertEquals(480, AutoQualityLadder.targetHeight(kBps(100), 720))
     }
+
+    @Test
+    fun `a floor lifts a slow connection and a ceiling holds a fast one`() {
+        assertEquals(1080, AutoQualityLadder.targetHeight(kBps(100), maxHeight = Int.MAX_VALUE, minHeight = 1080))
+        assertEquals(2160, AutoQualityLadder.targetHeight(kBps(50_000), maxHeight = Int.MAX_VALUE, minHeight = 1080))
+        assertEquals(1080, AutoQualityLadder.targetHeight(kBps(50_000), maxHeight = 1080, minHeight = 480))
+        assertEquals(720, AutoQualityLadder.targetHeight(kBps(300), maxHeight = 1080, minHeight = 480))
+    }
+
+    @Test
+    fun `a ceiling under the floor wins`() {
+        assertEquals(360, AutoQualityLadder.targetHeight(kBps(50_000), maxHeight = 360, minHeight = 480))
+        assertEquals(720, AutoQualityLadder.targetHeight(kBps(100), maxHeight = 720, minHeight = 1080))
+    }
+
+    @Test
+    fun `the saved floor and ceiling shape Auto and Shorts before a speed is measured`() {
+        val saved = AutoQualityLadder.shortsEstimateBps
+        try {
+            AutoQualityBounds.floor = 1080
+            AutoQualityLadder.shortsEstimateBps = 0L
+            assertEquals(1080, AutoQualityLadder.shortsHeight())
+            assertEquals(1080, AutoQualityLadder.targetHeight(kBps(100)))
+
+            AutoQualityBounds.floor = 0
+            AutoQualityBounds.ceiling = 720
+            assertEquals(720, AutoQualityLadder.targetHeight(kBps(50_000)))
+        } finally {
+            AutoQualityBounds.floor = 0
+            AutoQualityBounds.ceiling = 0
+            AutoQualityLadder.shortsEstimateBps = saved
+        }
+    }
 }

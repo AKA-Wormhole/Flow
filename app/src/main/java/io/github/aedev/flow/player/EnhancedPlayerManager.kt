@@ -54,6 +54,7 @@ import io.github.aedev.flow.player.media.MediaLoader
 import io.github.aedev.flow.player.preload.GaplessPreloadController
 import io.github.aedev.flow.player.preload.PreloadTarget
 import io.github.aedev.flow.player.quality.AdaptiveLadder
+import io.github.aedev.flow.player.quality.AutoQualityBounds
 import io.github.aedev.flow.player.quality.LiveQualityPick
 import io.github.aedev.flow.player.quality.LiveQualitySelection
 import io.github.aedev.flow.player.quality.QualityManager
@@ -2787,8 +2788,9 @@ class EnhancedPlayerManager private constructor() {
                 .buildUponParameters()
                 .setPreferredVideoMimeTypes(*VideoCodecUtils.preferredVideoMimeTypes(preferredVideoCodecKey))
         if (height <= 0) {
+            // Auto on a live stream also keeps to the viewer's ceiling; the floor needs a ladder it cannot see here.
             builder
-                .resetVideoSizeTo(videoSizeCap)
+                .resetVideoSizeTo(videoSizeCap.withCeiling(AutoQualityBounds.current().ceiling))
                 .setForceHighestSupportedBitrate(false)
         } else {
             val (maxWidth, maxHeight) = LiveQualitySelection.maxVideoSize(height, liveIsPortrait)
