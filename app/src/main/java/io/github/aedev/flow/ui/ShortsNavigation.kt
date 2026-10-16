@@ -42,17 +42,18 @@ internal fun NavHostController.openVideoOrShorts(
     if (video.isShort && !disableShortsPlayer) openShorts(ShortsQueueSource.SeededFeed(video.id)) else playVideo(video)
 }
 
-const val SOUND_ROUTE_PATTERN = "sound/{id}?params={params}&title={title}"
+const val SOUND_ROUTE_PATTERN = "sound?id={id}&params={params}&title={title}&video={video}"
 
 fun NavController.openSound(
     browseId: String,
     params: String,
     title: String,
+    videoId: String = "",
 ) {
     val previous = previousBackStackEntry
-    if (previous?.destination?.route == SOUND_ROUTE_PATTERN && previous.arguments?.getString("id") == browseId) {
+    if (previous?.destination?.route == SOUND_ROUTE_PATTERN && browseId.isNotBlank() && previous.arguments?.getString("id") == browseId) {
         popBackStack()
         return
     }
-    navigate("sound/${Uri.encode(browseId)}?params=${Uri.encode(params)}&title=${Uri.encode(title)}")
+    navigate("sound?id=${Uri.encode(browseId)}&params=${Uri.encode(params)}&title=${Uri.encode(title)}&video=${Uri.encode(videoId)}")
 }

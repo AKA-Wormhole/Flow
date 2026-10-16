@@ -148,9 +148,7 @@ fun NavGraphBuilder.flowAppGraph(
             onChannelClick = { channelId ->
                 mediaNavigator.openChannel(channelId)
             },
-            onSoundClick = { id, params, title ->
-                if (id.isNotBlank()) navController.openSound(id, params, title)
-            },
+            onSoundClick = { id, params, title, videoId -> navController.openSound(id, params, title, videoId) },
         )
     }
 
@@ -158,7 +156,8 @@ fun NavGraphBuilder.flowAppGraph(
         route = SOUND_ROUTE_PATTERN,
         arguments =
             listOf(
-                navArgument("id") { type = NavType.StringType },
+                navArgument("id") { type = NavType.StringType; defaultValue = "" },
+                navArgument("video") { type = NavType.StringType; defaultValue = "" },
                 navArgument("params") { type = NavType.StringType; defaultValue = "" },
                 navArgument("title") { type = NavType.StringType; defaultValue = "" },
             ),
@@ -168,6 +167,7 @@ fun NavGraphBuilder.flowAppGraph(
             browseId = entry.arguments?.getString("id").orEmpty(),
             params = entry.arguments?.getString("params").orEmpty(),
             title = entry.arguments?.getString("title").orEmpty(),
+            videoId = entry.arguments?.getString("video").orEmpty(),
             onBack = { navController.popBackStack() },
             onOpen = { source -> navController.openShorts(source) },
         )

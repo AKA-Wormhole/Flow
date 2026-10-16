@@ -81,14 +81,22 @@ class SoundShortsViewModel
         fun load(
             browseId: String,
             params: String,
+            videoId: String,
         ) {
-            val key = "$browseId|$params"
+            val key = "$browseId|$params|$videoId"
             if (key == loadedKey) return
             loadedKey = key
             viewModelScope.launch {
                 val reels =
                     withContext(Dispatchers.IO) {
-                        YouTube.soundShorts(browseId, params).getOrNull().orEmpty().map { it.toShortVideo() }
+                        var id = browseId
+                        var p = params
+                        if (id.isBlank() && videoId.isNotBlank()) {
+                            val overlay = YouTube.reelOverlay(videoId).getOrNull()
+                            id = overlay?.soundBrowseId.orEmpty()
+                            p = overlay?.soundParams.orEmpty()
+                        }
+                        if (id.isBlank()) emptyList() else YouTube.soundShorts(id, p).getOrNull().orEmpty().map { it.toShortVideo() }
                     }
                 _state.value = SoundShortsState(loading = false, shorts = reels)
             }
@@ -104,11 +112,12 @@ fun SoundShortsScreen(
     browseId: String,
     params: String,
     title: String,
+    videoId: String = "",
     onBack: () -> Unit,
     onOpen: (ShortsQueueSource) -> Unit,
     viewModel: SoundShortsViewModel = hiltViewModel(),
 ) {
-    LaunchedEffect(browseId, params) { viewModel.load(browseId, params) }
+    LaunchedEffect(browseId, params, videoId) { viewModel.load(browseId, params, videoId) }
     val state by viewModel.state.collectAsState()
     Scaffold(
         topBar = {
