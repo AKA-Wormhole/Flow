@@ -67,9 +67,10 @@ class MusicRecommendationAlgorithm
             context.getSharedPreferences("music_home_cache_prefs", Context.MODE_PRIVATE)
         }
 
+        // The cached home belongs to one identity: region, language and the signed-in account.
         private fun currentLocaleKey(): String =
             io.github.aedev.flow.innertube.YouTube.locale
-                .let { "${it.gl}|${it.hl}" }
+                .let { "${it.gl}|${it.hl}|${youTube.cookie?.takeIf { c -> c.isNotBlank() }?.hashCode() ?: "anon"}" }
 
         private fun isCacheLocaleCurrent(): Boolean = cachePrefs.getString(KEY_LAST_CACHE_LOCALE, null) == currentLocaleKey()
 

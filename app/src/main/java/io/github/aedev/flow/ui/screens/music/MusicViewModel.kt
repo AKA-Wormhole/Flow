@@ -78,6 +78,7 @@ class MusicViewModel
         private val musicGraph: MusicGraphStore,
         private val dailyMixStore: io.github.aedev.flow.data.recommendation.music.DailyMixStore,
         private val musicAccountSync: io.github.aedev.flow.account.MusicAccountSync,
+        private val accountManager: io.github.aedev.flow.account.AccountManager,
     ) : ViewModel() {
         companion object {
             /** Route prefix for synthesized Daily Mix playlist pages. */
@@ -93,6 +94,13 @@ class MusicViewModel
             private const val DEEP_CUT_LIMIT = 12
             private const val ARTISTS_FOR_YOU_LIMIT = 10
             private const val ARTISTS_FOR_YOU_SEEDS = 12
+
+            /**
+             * The Music home is YouTube Music's own feed, untouched. When false, none of the locally
+             * composed shelves (Quick Picks lanes, On Repeat, Daily Mixes, Similar to, Daily Discover,
+             * community playlists, deep cuts) are built, and YT's shelves are not re-ranked.
+             */
+            private const val LOCAL_SHELVES_ENABLED = false
         }
 
         private val _uiState = MutableStateFlow(MusicUiState())
@@ -159,6 +167,16 @@ class MusicViewModel
                 }
             }
 
+            // Signing in, out or switching account changes what YouTube Music recommends.
+            viewModelScope.launch(PerformanceDispatcher.networkIO) {
+                accountManager.activeId
+                    .distinctUntilChanged()
+                    .drop(1)
+                    .collect {
+                        if (isUiVisible()) refresh() else homeStale = true
+                    }
+            }
+
             viewModelScope.launch(PerformanceDispatcher.networkIO) {
                 combine(playerPreferences.contentLanguage, playerPreferences.trendingRegion) { language, region -> language to region }
                     .distinctUntilChanged()
@@ -203,6 +221,7 @@ class MusicViewModel
          * discovery lane, round-robin interleaved so fresh content always lands.
          */
         private suspend fun rebuildQuickPicks(current: MusicTrack?) {
+            if (!LOCAL_SHELVES_ENABLED) return
             try {
                 val history =
                     playlistRepository.history
@@ -430,6 +449,7 @@ class MusicViewModel
          * surface. Mixes are meant to be stable — no recently-shown avoidance.
          */
         private suspend fun refreshDailyMixes() {
+            if (!LOCAL_SHELVES_ENABLED) return
             try {
                 val sections = buildDailyMixSections()
                 if (sections.isNotEmpty()) {
@@ -486,6 +506,7 @@ class MusicViewModel
          * refreshed together per track change (visibility-gated by the callers).
          */
         private suspend fun refreshLocalShelves() {
+            if (!LOCAL_SHELVES_ENABLED) return
             try {
                 val onRepeat = musicBrain.onRepeatShelf()
                 val onRepeatIds = onRepeat.mapTo(HashSet()) { it.videoId }
@@ -545,6 +566,7 @@ class MusicViewModel
         }
 
         private suspend fun expandDeepCutAlbums(): Boolean {
+            if (!LOCAL_SHELVES_ENABLED) return false
             var recorded = false
             try {
                 val history = playlistRepository.history.firstOrNull().orEmpty()
@@ -700,7 +722,7 @@ class MusicViewModel
                 if (homeSections.isNotEmpty()) {
                     processHomeSections(homeSections)
                     _uiState.update { it.copy(homeContinuation = homeContinuation) }
-                } else if (!skippedFreshCache && !quickPicksComposed &&
+                } else if (LOCAL_SHELVES_ENABLED && !skippedFreshCache && !quickPicksComposed &&
                     _uiState.value.forYouTracks.isEmpty() && _uiState.value.dynamicSections.isEmpty()
                 ) {
                     val recs = musicRecommendationAlgorithm.getRecommendations(24).audioMusicOnly()
@@ -731,7 +753,7 @@ class MusicViewModel
                             history = history,
                             // Raw history is only an emergency placeholder — never over a composed shelf.
                             forYouTracks =
-                                if (it.forYouTracks.isEmpty() && !quickPicksComposed) {
+                                if (LOCAL_SHELVES_ENABLED && it.forYouTracks.isEmpty() && !quickPicksComposed) {
                                     history.audioMusicOnly().take(24)
                                 } else {
                                     it.forYouTracks
@@ -938,6 +960,7 @@ class MusicViewModel
         }
 
         private suspend fun loadCommunityPlaylists() {
+            if (!LOCAL_SHELVES_ENABLED) return
             try {
                 val history =
                     withContext(PerformanceDispatcher.diskIO) {
@@ -1014,6 +1037,7 @@ class MusicViewModel
         }
 
         private fun loadDynamicContent() {
+            if (!LOCAL_SHELVES_ENABLED) return
             viewModelScope.launch(PerformanceDispatcher.networkIO) {
                 val history = playlistRepository.history.firstOrNull() ?: emptyList()
                 val blocks = mutableListOf<SimilarToBlock>()
@@ -1245,12 +1269,11 @@ class MusicViewModel
                     }?.tracks
                     ?.audioMusicOnly() ?: emptyList()
 
-            // YT hands these shelves back unranked; a brain pass puts the user's
-            // taste first and drops blocked artists at the source.
-            val rankedListenAgain = musicBrain.rankTracks(listenAgain, "heavy_rotation")
-            val rankedRecommended = musicBrain.rankTracks(recommended, "quick_picks")
-            val rankedVideosForYou = musicBrain.rankTracks(musicVideosForYou, "quick_picks")
-            val rankedLongListens = musicBrain.rankTracks(longListens, "quick_picks")
+            // Kept in YouTube Music's own order; hidden artists are still filtered reactively in uiState.
+            val rankedListenAgain = listenAgain
+            val rankedRecommended = recommended
+            val rankedVideosForYou = musicVideosForYou
+            val rankedLongListens = longListens
 
             _uiState.update { currentState ->
                 currentState.copy(
@@ -1429,6 +1452,7 @@ class MusicViewModel
         }
 
         private suspend fun loadDailyDiscover() {
+            if (!LOCAL_SHELVES_ENABLED) return
             try {
                 val seeds =
                     withContext(PerformanceDispatcher.diskIO) {
