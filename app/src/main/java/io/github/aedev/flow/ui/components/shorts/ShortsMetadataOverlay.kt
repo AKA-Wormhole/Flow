@@ -14,13 +14,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.outlined.ShoppingBag
-import androidx.compose.material3.AssistChip
-import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -60,7 +59,11 @@ private val AvatarSize = 36.dp
 private val ChannelRowSpacing = 6.dp
 private val TitleSpacing = 2.dp
 private val SoundPillSpacing = 2.dp
-private val LinkedVideoSpacing = 4.dp
+private val LinkedVideoSpacing = 3.dp
+private val LinkedVideoBottomSpacing = 4.dp
+private val LinkedVideoHeight = 22.dp
+private val LinkedVideoMaxWidth = 170.dp
+private val LinkedVideoIconSize = 14.dp
 private val SubscribeToggleTouchSize = 48.dp
 private val SubscribeToggleSize = 32.dp
 private val SubscribeToggleIconSize = 22.dp
@@ -160,7 +163,7 @@ internal fun ShortsMetadataOverlay(
         }
 
         if (short.soundTitle.isNotBlank()) {
-            Spacer(modifier = Modifier.height(SoundPillSpacing))
+            Spacer(modifier = Modifier.height(if (short.linkedVideo != null) LinkedVideoBottomSpacing else SoundPillSpacing))
             ShortsSoundPill(title = short.soundTitle, animate = isPlaying)
         }
     }
@@ -271,33 +274,41 @@ private fun ShortsProductsButton(
     }
 }
 
+/**
+ * The video the reel links to: a slim, narrow pill. It is drawn by hand rather than as an
+ * AssistChip, whose 32 dp body is padded out to a 48 dp touch target and so covered a wide band of
+ * the picture; this one is 22 dp tall, capped in width, and its whole body is still tappable.
+ */
 @Composable
 private fun ShortsLinkedVideoChip(linkedVideo: ShortLinkedVideo) {
     val navigator = LocalMediaNavigator.current
-    AssistChip(
-        onClick = { navigator.openLink(YouTubeLink.Video(linkedVideo.id, isMusic = false)) },
-        label = {
-            Text(
-                text = linkedVideo.title ?: stringResource(R.string.shorts_linked_video),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        },
-        leadingIcon = {
-            Icon(
-                imageVector = Icons.Default.PlayArrow,
-                contentDescription = null,
-                modifier = Modifier.size(AssistChipDefaults.IconSize),
-            )
-        },
-        colors =
-            AssistChipDefaults.assistChipColors(
-                containerColor = PlayerScrimPanel,
-                labelColor = PlayerScrimContent,
-                leadingIconContentColor = PlayerScrimContent,
-            ),
-        border = null,
-    )
+    val shape = RoundedCornerShape(percent = 50)
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier =
+            Modifier
+                .widthIn(max = LinkedVideoMaxWidth)
+                .height(LinkedVideoHeight)
+                .clip(shape)
+                .background(PlayerScrimPanel)
+                .clickable { navigator.openLink(YouTubeLink.Video(linkedVideo.id, isMusic = false)) }
+                .padding(start = 5.dp, end = 8.dp),
+    ) {
+        Icon(
+            imageVector = Icons.Default.PlayArrow,
+            contentDescription = null,
+            tint = PlayerScrimContent,
+            modifier = Modifier.size(LinkedVideoIconSize),
+        )
+        Spacer(modifier = Modifier.width(4.dp))
+        Text(
+            text = linkedVideo.title ?: stringResource(R.string.shorts_linked_video),
+            style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 13.sp),
+            color = PlayerScrimContent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
