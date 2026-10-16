@@ -24,6 +24,8 @@ data class ReelOverlay(
     val relativeTimestamp: String? = null,
     val soundTitle: String? = null,
     val soundThumbnailUrl: String? = null,
+    val soundBrowseId: String? = null,
+    val soundParams: String? = null,
     val isSubscribed: Boolean? = null,
     val companionVideoId: String? = null,
     val companionVideoTitle: String? = null,
@@ -60,6 +62,8 @@ private fun ReelOverlay.filledFrom(other: ReelOverlay): ReelOverlay =
         relativeTimestamp = relativeTimestamp ?: other.relativeTimestamp,
         soundTitle = soundTitle ?: other.soundTitle,
         soundThumbnailUrl = soundThumbnailUrl ?: other.soundThumbnailUrl,
+        soundBrowseId = soundBrowseId ?: other.soundBrowseId,
+        soundParams = soundParams ?: other.soundParams,
         isSubscribed = isSubscribed ?: other.isSubscribed,
         companionVideoId = companionVideoId ?: other.companionVideoId,
         companionVideoTitle = if (companionVideoId != null) companionVideoTitle else other.companionVideoTitle,
@@ -85,6 +89,8 @@ private fun JsonObject.legacyOverlay(header: JsonObject?): ReelOverlay? {
         commentCountText = commentText,
         soundTitle = pivot?.get("contentDescription").youtubeText(),
         soundThumbnailUrl = pivot?.get("thumbnail").largestImageUrl(),
+        soundBrowseId = pivot?.findBrowseEndpoint()?.get("browseId").stringOrNull(),
+        soundParams = pivot?.findBrowseEndpoint()?.get("params").stringOrNull(),
         isSubscribed = subscribe?.get("subscribed").stringOrNull()?.toBooleanStrictOrNull(),
     )
 }
@@ -148,6 +154,8 @@ private fun JsonObject.viewModelOverlay(): ReelOverlay? {
         commentCountText = commentText,
         soundTitle = pivot?.at("soundAttributionTitle", "content").stringOrNull(),
         soundThumbnailUrl = pivot?.get("thumbnail").largestImageUrl(),
+        soundBrowseId = pivot?.findBrowseEndpoint()?.get("browseId").stringOrNull(),
+        soundParams = pivot?.findBrowseEndpoint()?.get("params").stringOrNull(),
         companionVideoId = companion?.first,
         companionVideoTitle = companion?.second,
     )
@@ -192,3 +200,20 @@ private fun channelIdFromEntityKey(key: String): String? =
 private val CHANNEL_ID = Regex("UC[0-9A-Za-z_-]{22}")
 
 private fun JsonElement?.at(vararg keys: String): JsonElement? = keys.fold(this) { node, key -> node.objectOrNull()?.get(key) }
+
+/** The first `browseEndpoint` anywhere under this node; the sound pivot's tap opens the sound page through one. */
+private fun JsonElement.findBrowseEndpoint(): JsonObject? =
+    when (this) {
+        is JsonObject -> {
+            this["browseEndpoint"].objectOrNull()
+                ?: values.firstNotNullOfOrNull { it.findBrowseEndpoint() }
+        }
+
+        is kotlinx.serialization.json.JsonArray -> {
+            firstNotNullOfOrNull { it.findBrowseEndpoint() }
+        }
+
+        else -> {
+            null
+        }
+    }

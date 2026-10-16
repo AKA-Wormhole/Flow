@@ -41,3 +41,13 @@ internal fun NavHostController.openVideoOrShorts(
 ) {
     if (video.isShort && !disableShortsPlayer) openShorts(ShortsQueueSource.SeededFeed(video.id)) else playVideo(video)
 }
+
+const val SOUND_ROUTE_PATTERN = "sound/{id}?params={params}&title={title}"
+
+fun NavController.openSound(
+    browseId: String,
+    params: String,
+    title: String,
+) {
+    navigate("sound/${Uri.encode(browseId)}?params=${Uri.encode(params)}&title=${Uri.encode(title)}")
+}

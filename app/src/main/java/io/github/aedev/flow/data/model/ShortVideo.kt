@@ -27,6 +27,8 @@ data class ShortVideo(
     val timestamp: Long = System.currentTimeMillis(),
     val soundTitle: String = "",
     val soundThumbnailUrl: String = "",
+    val soundBrowseId: String = "",
+    val soundParams: String = "",
     val playerParams: String? = null,
     val linkedVideo: ShortLinkedVideo? = null,
 )

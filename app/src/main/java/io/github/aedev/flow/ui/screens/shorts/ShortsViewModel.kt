@@ -390,6 +390,8 @@ class ShortsViewModel
                 uploadDate = uploadDate.ifBlank { overlay.relativeTimestamp.orEmpty() },
                 soundTitle = overlay.soundTitle ?: soundTitle,
                 soundThumbnailUrl = overlay.soundThumbnailUrl ?: soundThumbnailUrl,
+                soundBrowseId = overlay.soundBrowseId ?: soundBrowseId,
+                soundParams = overlay.soundParams ?: soundParams,
                 linkedVideo =
                     overlay.companionVideoId?.let { ShortLinkedVideo(it, overlay.companionVideoTitle) } ?: linkedVideo,
             )

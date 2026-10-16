@@ -44,6 +44,7 @@ import io.github.aedev.flow.ui.screens.recap.story.RecapStoryScreen
 import io.github.aedev.flow.ui.screens.search.SearchScreen
 import io.github.aedev.flow.ui.screens.settings.SettingsHost
 import io.github.aedev.flow.ui.screens.shorts.ShortsScreen
+import io.github.aedev.flow.ui.screens.sound.SoundShortsScreen
 import io.github.aedev.flow.ui.screens.subscriptions.SubscriptionsScreen
 import io.github.aedev.flow.ui.screens.update.UPDATE_ROUTE
 import io.github.aedev.flow.ui.screens.update.UpdateScreen
@@ -147,6 +148,28 @@ fun NavGraphBuilder.flowAppGraph(
             onChannelClick = { channelId ->
                 mediaNavigator.openChannel(channelId)
             },
+            onSoundClick = { id, params, title ->
+                if (id.isNotBlank()) navController.openSound(id, params, title)
+            },
+        )
+    }
+
+    composable(
+        route = SOUND_ROUTE_PATTERN,
+        arguments =
+            listOf(
+                navArgument("id") { type = NavType.StringType },
+                navArgument("params") { type = NavType.StringType; defaultValue = "" },
+                navArgument("title") { type = NavType.StringType; defaultValue = "" },
+            ),
+    ) { entry ->
+        currentRoute.value = "sound"
+        SoundShortsScreen(
+            browseId = entry.arguments?.getString("id").orEmpty(),
+            params = entry.arguments?.getString("params").orEmpty(),
+            title = entry.arguments?.getString("title").orEmpty(),
+            onBack = { navController.popBackStack() },
+            onOpen = { source -> navController.openShorts(source) },
         )
     }
 

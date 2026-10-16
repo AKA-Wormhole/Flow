@@ -1,5 +1,9 @@
 package io.github.aedev.flow.ui.components.shorts
 
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.remember
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -57,7 +61,9 @@ internal fun ShortsActionRail(
     onSaveClick: () -> Unit,
     channelAvatarUrl: String,
     channelName: String,
-    @Suppress("UNUSED_PARAMETER") isDiscSpinning: Boolean,
+    isDiscSpinning: Boolean,
+    soundThumbnailUrl: String = "",
+    onSoundClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -90,6 +96,43 @@ internal fun ShortsActionRail(
             avatarUrl = channelAvatarUrl,
             channelName = channelName,
         )
+        ShortsSoundDisc(
+            url = soundThumbnailUrl.ifBlank { channelAvatarUrl },
+            spinning = isDiscSpinning,
+            onClick = onSoundClick,
+        )
+    }
+}
+
+/** The round sound logo at the rail's foot; it spins while the reel plays and opens the sound's page. */
+@Composable
+private fun ShortsSoundDisc(
+    url: String,
+    spinning: Boolean,
+    onClick: () -> Unit,
+) {
+    val rotation = remember { androidx.compose.animation.core.Animatable(0f) }
+    androidx.compose.runtime.LaunchedEffect(spinning) {
+        if (spinning) {
+            while (true) {
+                rotation.animateTo(
+                    rotation.value + 360f,
+                    androidx.compose.animation.core.tween(6000, easing = androidx.compose.animation.core.LinearEasing),
+                )
+            }
+        }
+    }
+    Box(
+        modifier =
+            Modifier
+                .size(AvatarSize)
+                .graphicsLayer { rotationZ = rotation.value }
+                .border(AvatarOutline, PlayerScrimContent, CircleShape)
+                .padding(AvatarOutline)
+                .clip(CircleShape)
+                .clickable(onClick = onClick),
+    ) {
+        ChannelAvatarImage(url = url, contentDescription = stringResource(R.string.sound_original), modifier = Modifier.fillMaxSize())
     }
 }
 

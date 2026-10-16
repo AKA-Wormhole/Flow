@@ -228,7 +228,15 @@ fun HomeScreen(
                 modifier =
                     Modifier
                         .fillMaxSize()
-                        .nestedScroll(chipRowBehavior.nestedScrollConnection),
+                        .then(
+                            // Without the chip row its height limit is never set, and the behaviour
+                            // would swallow every scroll as header collapse, leaving the feed stuck.
+                            if (homeFeedEnabled && chips.chips.size > 1) {
+                                Modifier.nestedScroll(chipRowBehavior.nestedScrollConnection)
+                            } else {
+                                Modifier
+                            },
+                        ),
             ) {
                 BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                     val isListView = homeViewMode == HomeViewMode.LIST

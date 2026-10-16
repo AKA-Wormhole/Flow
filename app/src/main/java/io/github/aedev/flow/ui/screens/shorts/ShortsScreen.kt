@@ -75,6 +75,7 @@ fun ShortsScreen(
     source: ShortsQueueSource,
     onBack: () -> Unit,
     onChannelClick: (String) -> Unit,
+    onSoundClick: (browseId: String, params: String, title: String) -> Unit = { _, _, _ -> },
     bottomNavOverlayPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
     viewModel: ShortsViewModel = hiltViewModel(),
@@ -219,6 +220,7 @@ fun ShortsScreen(
                                     viewModel.loadShortDescription(short.id)
                                     showDescriptionSheet = true
                                 },
+                                onSoundClick = { onSoundClick(short.soundBrowseId, short.soundParams, short.soundTitle) },
                                 onMoreClick = { settingsSheet.open(page, short.id) },
                                 onVideoEnded = {
                                     scope.launch {

@@ -383,6 +383,8 @@ internal fun ShortsReelPage(
                     channelAvatarUrl = short.channelThumbnailUrl,
                     channelName = short.channelName,
                     isDiscSpinning = isActive && pageState.isPlaying,
+                    soundThumbnailUrl = short.soundThumbnailUrl,
+                    onSoundClick = actions.onSoundClick,
                 )
             }
         }

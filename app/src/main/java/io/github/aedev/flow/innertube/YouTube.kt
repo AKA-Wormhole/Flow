@@ -2908,6 +2908,18 @@ object YouTube {
     /** The reels that follow [videoId]. The response never contains the seed itself. */
     suspend fun shortsFromVideo(videoId: String): Result<ReelSequencePage> = shorts(ReelParams.seedSequenceParams(videoId))
 
+    /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
+    suspend fun soundShorts(
+        browseId: String,
+        params: String?,
+    ): Result<List<io.github.aedev.flow.innertube.pages.reel.ReelLockup>> =
+        runCatching {
+            ensureVisitorData()
+            channelBrowseJson(browseId = browseId, params = params?.takeIf { it.isNotBlank() })
+                .jsonObject
+                .toReelLockups()
+        }
+
     /** Title, channel, counts and sound for one reel — everything the sequence leaves out. */
     suspend fun reelOverlay(videoId: String): Result<ReelOverlay?> =
         runCatching {

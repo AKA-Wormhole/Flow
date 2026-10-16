@@ -23,6 +23,7 @@ internal data class ShortsReelActions(
     val onChannelClick: () -> Unit,
     val onCommentsClick: () -> Unit,
     val onDescriptionClick: () -> Unit,
+    val onSoundClick: () -> Unit = {},
     val onMoreClick: () -> Unit,
     val onVideoEnded: () -> Unit = {},
 )

@@ -162,9 +162,12 @@ internal fun ShortsMetadataOverlay(
             ShortsLinkedVideoChip(linkedVideo)
         }
 
-        if (short.soundTitle.isNotBlank()) {
+        if (short.soundTitle.isNotBlank() || short.soundBrowseId.isNotBlank()) {
             Spacer(modifier = Modifier.height(if (short.linkedVideo != null) LinkedVideoBottomSpacing else SoundPillSpacing))
-            ShortsSoundPill(title = short.soundTitle, animate = isPlaying)
+            ShortsSoundPill(
+                title = short.soundTitle.ifBlank { stringResource(R.string.sound_original) },
+                animate = isPlaying,
+            )
         }
     }
 }

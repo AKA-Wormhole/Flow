@@ -73,13 +73,10 @@ data class HomePage(
                             ?.browseEndpoint,
                     items =
                         renderer.contents
-                            .mapNotNull { content ->
-                                // "Quick picks" and similar shelves are lists of rows
-                                // (musicResponsiveListItemRenderer), not two-row cards.
-                                content.musicTwoRowItemRenderer?.let { fromMusicTwoRowItemRenderer(it) }
-                                    ?: content.musicResponsiveListItemRenderer?.let {
-                                        RelatedPage.fromMusicResponsiveListItemRenderer(it)
-                                    }
+                            .mapNotNull {
+                                it.musicTwoRowItemRenderer
+                            }.mapNotNull {
+                                fromMusicTwoRowItemRenderer(it)
                             }.ifEmpty {
                                 return null
                             },

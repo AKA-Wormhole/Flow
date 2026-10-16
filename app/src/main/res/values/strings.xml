@@ -4418,4 +4418,11 @@
     <string name="comment_translated_from">Translated from %1$s</string>
     <string name="comment_translate_failed">Couldn\'t translate this comment</string>
     <string name="comment_already_in">This comment is already in %1$s</string>
+    <string name="sound_original">Original audio</string>
+    <string name="sound_empty">No shorts found for this sound</string>
+    <string name="sound_play_all">Play all</string>
+    <plurals name="sound_shorts_count">
+        <item quantity="one">%d short</item>
+        <item quantity="other">%d shorts</item>
+    </plurals>
 </resources>
