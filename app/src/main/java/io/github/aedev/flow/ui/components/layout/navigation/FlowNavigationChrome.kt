@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ShortNavigationBarDefaults
@@ -36,7 +37,7 @@ object FlowNavigationDefaults {
      * The bar's height above the system navigation inset: Material's short navigation bar
      * container. The bar reports its real height, which grows past this at large font scales.
      */
-    val BarHeight: Dp = 64.dp
+    val BarHeight: Dp = 54.dp
 }
 
 /**
@@ -134,6 +135,8 @@ private fun BoxScope.NavigationBarSlot(
             modifier =
                 Modifier
                     .testTag(FLOW_NAV_BAR_TAG)
+                    // Slimmer than Material's 64dp, closer to YouTube's bar; the system inset sits on top.
+                    .height(with(density) { FlowNavigationDefaults.BarHeight + bottomInsetPx.toDp() })
                     .onSizeChanged { onHeightChanged(with(density) { (it.height - bottomInsetPx).toDp() }) },
         )
     }
