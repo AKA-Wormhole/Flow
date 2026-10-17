@@ -2908,6 +2908,72 @@ object YouTube {
     /** The reels that follow [videoId]. The response never contains the seed itself. */
     suspend fun shortsFromVideo(videoId: String): Result<ReelSequencePage> = shorts(ReelParams.seedSequenceParams(videoId))
 
+    /** The sound page YouTube links a reel to (its /source/ page), when the reel's own pivot has no usable link. */
+    suspend fun soundEndpointForVideo(videoId: String): Result<Pair<String, String?>> =
+        runCatching {
+            ensureVisitorData()
+            val endpoint =
+                innerTube
+                    .resolveUrl(WEB, "https://www.youtube.com/source/$videoId/shorts")
+                    .body<ResolveUrlResponse>()
+                    .endpoint
+                    ?.browseEndpoint
+                    ?: error("No sound page for $videoId")
+            endpoint.browseId to endpoint.params
+        }
+
+    /** The reels listed on youtube.com's own sound page, read from the page's embedded ytInitialData. */
+    suspend fun soundShortsFromPage(videoId: String): Result<List<ReelLockup>> =
+        runCatching {
+            val html = innerTube.soundPageHtml(WEB, videoId)
+            val marker = html.indexOf("ytInitialData")
+            check(marker >= 0) { "No page data for $videoId" }
+            val start = html.indexOf('{', marker)
+            var depth = 0
+            var inString = false
+            var escaped = false
+            var end = -1
+            for (i in start until html.length) {
+                val c = html[i]
+                if (inString) {
+                    if (escaped) {
+                        escaped = false
+                    } else if (c == '\\') {
+                        escaped = true
+                    } else if (c == '"') {
+                        inString = false
+                    }
+                } else if (c == '"') {
+                    inString = true
+                } else if (c == '{') {
+                    depth++
+                } else if (c == '}' && --depth == 0) {
+                    end = i
+                    break
+                }
+            }
+            check(end > start) { "Unreadable page data" }
+            Json.parseToJsonElement(html.substring(start, end + 1)).jsonObject.toReelLockups()
+        }
+
+    /**
+     * The sfv_audio_pivot feed (Shorts that use a video's audio) browsed directly. Its params are not
+     * documented, so a few plausible encodings of the video id are tried, then none at all.
+     */
+    suspend fun soundShortsViaAudioPivot(videoId: String): Result<List<ReelLockup>> =
+        runCatching {
+            val id = videoId.toByteArray()
+            val flat = byteArrayOf(0x0A, id.size.toByte()) + id
+            val nested = byteArrayOf(0x0A, flat.size.toByte()) + flat
+            val candidates =
+                listOf(flat, nested).map { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) } + listOf(null)
+            for (params in candidates) {
+                val reels = soundShorts("FEsfv_audio_pivot", params).getOrNull().orEmpty()
+                if (reels.isNotEmpty()) return@runCatching reels
+            }
+            emptyList()
+        }
+
     /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
     suspend fun soundShorts(
         browseId: String,

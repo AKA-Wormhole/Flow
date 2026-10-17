@@ -43,7 +43,11 @@ fun JsonObject.toReelOverlay(): ReelOverlay? {
     val viewModel = overlay.viewModelOverlay()
     if (legacy == null && viewModel == null) return null
     val merged = (viewModel ?: ReelOverlay()).let { vm -> legacy?.let { vm.filledFrom(it) } ?: vm }
+    // The pivot's usual spot varies by response; fall back to any pivot button anywhere in it.
+    val anyPivotEndpoint = if (merged.soundBrowseId == null) findPivotNode()?.findBrowseEndpoint() else null
     return merged.copy(
+        soundBrowseId = merged.soundBrowseId ?: anyPivotEndpoint?.get("browseId").stringOrNull(),
+        soundParams = merged.soundParams ?: anyPivotEndpoint?.get("params").stringOrNull(),
         relativeTimestamp = header?.get("timestampText").youtubeText() ?: merged.relativeTimestamp,
         isSubscribed = merged.isSubscribed ?: subscriptionState(),
     )
@@ -211,6 +215,23 @@ private fun JsonElement.findBrowseEndpoint(): JsonObject? =
 
         is kotlinx.serialization.json.JsonArray -> {
             firstNotNullOfOrNull { it.findBrowseEndpoint() }
+        }
+
+        else -> {
+            null
+        }
+    }
+
+/** The first pivot button (sound button) node anywhere under this element, in either response shape. */
+private fun JsonElement.findPivotNode(): JsonElement? =
+    when (this) {
+        is JsonObject -> {
+            this["pivotButtonRenderer"] ?: this["pivotButtonViewModel"]
+                ?: values.firstNotNullOfOrNull { it.findPivotNode() }
+        }
+
+        is kotlinx.serialization.json.JsonArray -> {
+            firstNotNullOfOrNull { it.findPivotNode() }
         }
 
         else -> {

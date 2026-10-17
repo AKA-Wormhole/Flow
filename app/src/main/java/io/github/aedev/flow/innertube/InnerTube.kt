@@ -474,6 +474,20 @@ class InnerTube {
         )
     }
 
+    /** The HTML of youtube.com's sound page for a reel (/source/<id>/shorts), which embeds its feed as ytInitialData. */
+    suspend fun soundPageHtml(
+        client: YouTubeClient,
+        videoId: String,
+    ): String =
+        httpClient
+            .get("https://www.youtube.com/source/$videoId/shorts") {
+                userAgent(client.userAgent)
+                headers {
+                    append("Accept-Language", locale.hl)
+                    if (isSignedIn) appendAccountAuth(YouTubeClient.ORIGIN_YOUTUBE)
+                }
+            }.bodyAsText()
+
     /** What a youtube.com link points at, as the endpoint the site would follow for it. */
     suspend fun resolveUrl(
         client: YouTubeClient,

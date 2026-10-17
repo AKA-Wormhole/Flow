@@ -89,14 +89,10 @@ class SoundShortsViewModel
             viewModelScope.launch {
                 val reels =
                     withContext(Dispatchers.IO) {
-                        var id = browseId
-                        var p = params
-                        if (id.isBlank() && videoId.isNotBlank()) {
-                            val overlay = YouTube.reelOverlay(videoId).getOrNull()
-                            id = overlay?.soundBrowseId.orEmpty()
-                            p = overlay?.soundParams.orEmpty()
-                        }
-                        if (id.isBlank()) {
+                        suspend fun fetch(
+                            id: String,
+                            p: String?,
+                        ) = if (id.isBlank()) {
                             emptyList()
                         } else {
                             YouTube
@@ -105,6 +101,36 @@ class SoundShortsViewModel
                                 .orEmpty()
                                 .map { it.toShortVideo() }
                         }
+                        // YouTube's own sound feed is the reel's /source/ page, so it goes first.
+                        var found =
+                            if (videoId.isBlank()) {
+                                emptyList()
+                            } else {
+                                val source = YouTube.soundEndpointForVideo(videoId).getOrNull()
+                                fetch(source?.first.orEmpty(), source?.second)
+                            }
+                        if (found.isEmpty() && videoId.isNotBlank()) {
+                            found =
+                                YouTube
+                                    .soundShortsFromPage(videoId)
+                                    .getOrNull()
+                                    .orEmpty()
+                                    .map { it.toShortVideo() }
+                        }
+                        if (found.isEmpty() && videoId.isNotBlank()) {
+                            found =
+                                YouTube
+                                    .soundShortsViaAudioPivot(videoId)
+                                    .getOrNull()
+                                    .orEmpty()
+                                    .map { it.toShortVideo() }
+                        }
+                        if (found.isEmpty()) found = fetch(browseId, params)
+                        if (found.isEmpty() && videoId.isNotBlank()) {
+                            val overlay = YouTube.reelOverlay(videoId).getOrNull()
+                            found = fetch(overlay?.soundBrowseId.orEmpty(), overlay?.soundParams)
+                        }
+                        found
                     }
                 _state.value = SoundShortsState(loading = false, shorts = reels)
             }
