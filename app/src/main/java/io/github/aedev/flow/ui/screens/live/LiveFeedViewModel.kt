@@ -99,7 +99,7 @@ class LiveFeedViewModel
             const val BATCH = 3
             val TOPICS =
                 listOf("live now", "live stream", "live music", "live gaming", "live news", "live sports", "live podcast", "live talk")
-            val LIVE_PARAMS: String =
+            val LIVE_PARAMS: String? =
                 YouTubeSearchParams.build(
                     contentType = YouTubeSearchParams.ContentType.VIDEO,
                     features = setOf(YouTubeSearchParams.Feature.LIVE),
