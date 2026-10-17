@@ -2924,10 +2924,36 @@ object YouTube {
             endpoint.browseId to endpoint.params
         }
 
+    /**
+     * The `bp` value of youtube.com/feed/sfv_audio_pivot, built the way yt-dlp builds it: field 94 holds a
+     * message whose field 2 holds the video id three times (tags 1, 2 and 3).
+     */
+    private fun audioPivotParams(videoId: String): String {
+        val id = videoId.toByteArray()
+
+        fun field(
+            tag: Int,
+            body: ByteArray,
+        ) = byteArrayOf(tag.toByte(), body.size.toByte()) + body
+        val triple = field(0x0A, id) + field(0x12, id) + field(0x1A, id)
+        val message = field(0x0A, field(0x12, triple))
+        val bytes = byteArrayOf(0xF2.toByte(), 0x05, message.size.toByte()) + message
+        return android.util.Base64.encodeToString(bytes, android.util.Base64.NO_WRAP)
+    }
+
     /** The reels listed on youtube.com's own sound page, read from the page's embedded ytInitialData. */
-    suspend fun soundShortsFromPage(videoId: String): Result<List<ReelLockup>> =
+    suspend fun soundShortsFromPage(
+        videoId: String,
+        feed: Boolean = false,
+    ): Result<List<ReelLockup>> =
         runCatching {
-            val html = innerTube.soundPageHtml(WEB, videoId)
+            val url =
+                if (feed) {
+                    "https://www.youtube.com/feed/sfv_audio_pivot?bp=" + java.net.URLEncoder.encode(audioPivotParams(videoId), "UTF-8")
+                } else {
+                    "https://www.youtube.com/source/$videoId/shorts"
+                }
+            val html = innerTube.soundPageHtml(WEB, url)
             val marker = html.indexOf("ytInitialData")
             check(marker >= 0) { "No page data for $videoId" }
             val start = html.indexOf('{', marker)
@@ -2965,15 +2991,42 @@ object YouTube {
     suspend fun soundShortsViaAudioPivot(videoId: String): Result<List<ReelLockup>> =
         runCatching {
             val id = videoId.toByteArray()
-            val flat = byteArrayOf(0x0A, id.size.toByte()) + id
-            val nested = byteArrayOf(0x0A, flat.size.toByte()) + flat
-            val candidates =
-                listOf(flat, nested).map { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) } + listOf(null)
-            for (params in candidates) {
-                val reels = soundShorts("FEsfv_audio_pivot", params).getOrNull().orEmpty()
-                if (reels.isNotEmpty()) return@runCatching reels
+
+            fun field(
+                tag: Int,
+                body: ByteArray,
+            ) = byteArrayOf(tag.toByte(), body.size.toByte()) + body
+
+            // yt-dlp's audio pivot: field 94 holds one message that names the video id three times.
+            // The exact tags are uncertain, so several layouts are tried and each outcome is logged.
+            fun wrap(inner: ByteArray) = byteArrayOf(0xF2.toByte(), 0x05, (2 + inner.size).toByte()) + field(0x0A, inner)
+            val layouts =
+                linkedMapOf<String, ByteArray>(
+                    "yt-dlp exact" to android.util.Base64.decode(audioPivotParams(videoId), android.util.Base64.NO_WRAP),
+                    "ids 1,2,3" to wrap(field(0x0A, id) + field(0x12, id) + field(0x1A, id)),
+                    "ids 2,3,4" to wrap(field(0x12, id) + field(0x1A, id) + field(0x22, id)),
+                    "ids 2,3,4 +flag" to wrap(byteArrayOf(0x08, 0x01) + field(0x12, id) + field(0x1A, id) + field(0x22, id)),
+                    "id only" to field(0x0A, id),
+                    "id nested" to field(0x0A, field(0x0A, id)),
+                )
+            var best = emptyList<ReelLockup>()
+            val attempts: List<Pair<String, ByteArray?>> = layouts.map { it.key to it.value } + listOf("no params" to null)
+            for ((name, bytes) in attempts) {
+                val params = bytes?.let { android.util.Base64.encodeToString(it, android.util.Base64.NO_WRAP) }
+                val result = soundShorts("FEsfv_audio_pivot", params)
+                val reels = result.getOrNull().orEmpty()
+                synchronized(soundShape) {
+                    soundShape.append(
+                        "  pivot [$name]: ${result.exceptionOrNull()?.let {
+                            "${it.javaClass.simpleName} ${it.message?.take(
+                                70,
+                            )}"
+                        } ?: "${reels.size} shorts"}\n",
+                    )
+                }
+                if (reels.size > best.size) best = reels
             }
-            emptyList()
+            best
         }
 
     /** The first page of a sound feed plus the pages after it; the feed opens with only a few reels. */
@@ -3104,6 +3157,49 @@ object YouTube {
                 null
             }
         }
+
+    /**
+     * Video ids the reel's sound button points at. A reel that reuses someone else's audio is keyed by that
+     * source video, not by itself; asking for the reel's own id then lists only the reel. The button's raw
+     * text is also written to the sound log so its real shape can be read.
+     */
+    suspend fun soundSourceIds(videoId: String): List<String> =
+        runCatching {
+            val response = innerTube.reelItemWatch(client = WEB, videoId = videoId).body<JsonObject>()
+
+            fun find(e: JsonElement): JsonElement? =
+                when (e) {
+                    is JsonObject -> e["pivotButtonRenderer"] ?: e["pivotButtonViewModel"] ?: e.values.firstNotNullOfOrNull(::find)
+                    is JsonArray -> e.firstNotNullOfOrNull(::find)
+                    else -> null
+                }
+            val node = find(response)
+            val text = node?.toString().orEmpty()
+            synchronized(soundShape) {
+                soundShape.append("  sound button: ${if (node == null) "NOT IN RESPONSE" else text.take(700)}\n")
+            }
+            // The sound page link (/source/<id>/shorts) can sit anywhere in the response, so search all of it first.
+            val everywhere =
+                Regex("/source/([A-Za-z0-9_-]{11})").findAll(response.toString()).map { it.groupValues[1] }.toList()
+            synchronized(soundShape) { soundShape.append("  /source/ links in whole response: ${everywhere.distinct()}\n") }
+            // The reel's own web page carries the same button; read it when the details response lacks the link.
+            val fromPage =
+                if (everywhere.any { it != videoId }) {
+                    emptyList()
+                } else {
+                    runCatching {
+                        Regex("/source/([A-Za-z0-9_-]{11})")
+                            .findAll(innerTube.soundPageHtml(WEB, "https://www.youtube.com/shorts/$videoId"))
+                            .map { it.groupValues[1] }
+                            .toList()
+                    }.getOrDefault(emptyList())
+                }
+            synchronized(soundShape) { soundShape.append("  /source/ links on the shorts page: ${fromPage.distinct()}\n") }
+            (everywhere + fromPage + Regex("\"videoId\":\"([A-Za-z0-9_-]{11})").findAll(text).map { it.groupValues[1] })
+                .filter { it != videoId }
+                .distinct()
+                .toList()
+        }.getOrDefault(emptyList())
 
     /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
     suspend fun soundShorts(

@@ -477,10 +477,10 @@ class InnerTube {
     /** The HTML of youtube.com's sound page for a reel (/source/<id>/shorts), which embeds its feed as ytInitialData. */
     suspend fun soundPageHtml(
         client: YouTubeClient,
-        videoId: String,
+        url: String,
     ): String =
         httpClient
-            .get("https://www.youtube.com/source/$videoId/shorts") {
+            .get(url) {
                 userAgent(client.userAgent)
                 headers {
                     append("Accept-Language", locale.hl)

@@ -4425,4 +4425,5 @@
         <item quantity="one">%d short</item>
         <item quantity="other">%d shorts</item>
     </plurals>
+    <string name="sound_only_one">Only this short uses this sound</string>
 </resources>

@@ -163,21 +163,26 @@ class SoundShortsViewModel
                             YouTube.takeSoundShape().takeIf { it.isNotBlank() }?.let { log.append(it) }
                             return list
                         }
+                        val sourceIds = if (videoId.isBlank()) emptyList() else YouTube.soundSourceIds(videoId)
+                        log.append(YouTube.takeSoundShape())
+                        log.appendLine("Audio source ids: ${sourceIds.ifEmpty { listOf("none, using the short itself") }}")
+                        val candidateIds = (sourceIds + listOfNotNull(videoId.takeIf { it.isNotBlank() })).distinct()
                         var best = emptyList<ShortVideo>()
                         val sources: List<suspend () -> List<ShortVideo>> =
                             buildList {
-                                if (videoId.isNotBlank()) {
+                                for (id in candidateIds) {
+                                    add { YouTube.soundShortsFromPage(id, feed = true).mapped("feed page $id") }
+                                    add { YouTube.soundShortsViaAudioPivot(id).mapped("pivot $id") }
                                     add {
-                                        val source = YouTube.soundEndpointForVideo(videoId).getOrNull()
+                                        val source = YouTube.soundEndpointForVideo(id).getOrNull()
                                         if (source == null) {
-                                            log.appendLine("resolve: FAILED (YouTube gave no sound page for this short)")
+                                            log.appendLine("resolve $id: FAILED (YouTube gave no sound page)")
                                             emptyList()
                                         } else {
-                                            YouTube.soundShorts(source.first, source.second).mapped("resolve")
+                                            YouTube.soundShorts(source.first, source.second).mapped("resolve $id")
                                         }
                                     }
-                                    add { YouTube.soundShortsFromPage(videoId).mapped("page") }
-                                    add { YouTube.soundShortsViaAudioPivot(videoId).mapped("pivot") }
+                                    add { YouTube.soundShortsFromPage(id).mapped("page $id") }
                                 }
                                 if (browseId.isNotBlank()) add { YouTube.soundShorts(browseId, params).mapped("link") }
                                 if (videoId.isNotBlank()) {
@@ -343,7 +348,13 @@ private fun SoundHeader(
                 overflow = TextOverflow.Ellipsis,
             )
             Text(
-                pluralStringResource(R.plurals.sound_shorts_count, count, count),
+                if (count ==
+                    1
+                ) {
+                    stringResource(R.string.sound_only_one)
+                } else {
+                    pluralStringResource(R.plurals.sound_shorts_count, count, count)
+                },
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
