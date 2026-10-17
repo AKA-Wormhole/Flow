@@ -2980,16 +2980,105 @@ object YouTube {
     private suspend fun soundPages(first: JsonObject): List<ReelLockup> {
         val reels = LinkedHashMap<String, ReelLockup>()
         first.toReelLockups().forEach { reels.putIfAbsent(it.id, it) }
+        if (reels.isEmpty()) first.looseReelLockups().forEach { reels.putIfAbsent(it.id, it) }
+        recordSoundShape(first, reels.size)
         var token = first.nextPageToken()
         var pages = 0
         while (token != null && pages++ < 8) {
             val page = channelBrowseJson(continuation = token).jsonObject
             val before = reels.size
-            page.toReelLockups().forEach { reels.putIfAbsent(it.id, it) }
+            page.toReelLockups().ifEmpty { page.looseReelLockups() }.forEach { reels.putIfAbsent(it.id, it) }
             if (reels.size == before) break
             token = page.nextPageToken()
         }
         return reels.values.toList()
+    }
+
+    private val soundShape = StringBuilder()
+
+    /** What the last sound request's response was made of, for the on-screen log; read once, then cleared. */
+    fun takeSoundShape(): String =
+        synchronized(soundShape) {
+            soundShape.toString().also { soundShape.clear() }
+        }
+
+    private fun recordSoundShape(
+        response: JsonObject,
+        parsed: Int,
+    ) {
+        val counts = HashMap<String, Int>()
+
+        fun walk(e: JsonElement) {
+            when (e) {
+                is JsonObject -> {
+                    e.forEach { (k, v) ->
+                        if (k.endsWith("Renderer") || k.endsWith("ViewModel") || k.endsWith("Endpoint")) counts.merge(k, 1, Int::plus)
+                        walk(v)
+                    }
+                }
+
+                is JsonArray -> {
+                    e.forEach(::walk)
+                }
+
+                else -> {
+                    Unit
+                }
+            }
+        }
+        walk(response)
+        val top =
+            counts.entries
+                .sortedByDescending { it.value }
+                .take(14)
+                .joinToString { "${it.key}x${it.value}" }
+        synchronized(soundShape) {
+            soundShape.append("  response keys: ${response.keys.take(8)}; parsed=$parsed; $top\n")
+        }
+    }
+
+    /** Reels found by any `reelWatchEndpoint` or `/shorts/<id>` link, for feeds that use a renderer the strict parser skips. */
+    private fun JsonObject.looseReelLockups(): List<ReelLockup> {
+        val ids = LinkedHashSet<String>()
+        val shortsLink = Regex("/shorts/([A-Za-z0-9_-]{11})")
+
+        fun walk(e: JsonElement) {
+            when (e) {
+                is JsonObject -> {
+                    e["reelWatchEndpoint"]
+                        .objectOrNull()
+                        ?.get("videoId")
+                        .stringOrNull()
+                        ?.let(ids::add)
+                    e.values.forEach(::walk)
+                }
+
+                is JsonArray -> {
+                    e.forEach(::walk)
+                }
+
+                is kotlinx.serialization.json.JsonPrimitive -> {
+                    if (e.isString) {
+                        shortsLink
+                            .find(e.content)
+                            ?.groupValues
+                            ?.get(1)
+                            ?.let(ids::add)
+                    }
+                }
+            }
+        }
+        walk(this)
+        return ids.map { id ->
+            ReelLockup(
+                id = id,
+                title = "",
+                viewCount = 0,
+                thumbnailUrl =
+                    io.github.aedev.flow.innertube.pages.reel
+                        .reelPosterUrl(id),
+            )
+        }
     }
 
     private fun JsonElement.nextPageToken(): String? =

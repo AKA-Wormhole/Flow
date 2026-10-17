@@ -160,6 +160,7 @@ class SoundShortsViewModel
                         fun Result<List<io.github.aedev.flow.innertube.pages.reel.ReelLockup>>.mapped(name: String): List<ShortVideo> {
                             val list = getOrNull().orEmpty().map { it.toShortVideo() }
                             log.appendLine(describeSoundAttempt(name, exceptionOrNull(), list.size))
+                            YouTube.takeSoundShape().takeIf { it.isNotBlank() }?.let { log.append(it) }
                             return list
                         }
                         var best = emptyList<ShortVideo>()
