@@ -22,7 +22,7 @@ plugins {
 
 spotless {
     // Adopt formatting incrementally from the main commit that introduced linting.
-    ratchetFrom("b3c31acefb1693c48f47c1632f4a26ef3e77ec4e")
+    ratchetFrom("48078360e965e9ba311b02d928d80ea5b462a699")
     lineEndings = LineEnding.UNIX
 
     val ktlintConfig =
