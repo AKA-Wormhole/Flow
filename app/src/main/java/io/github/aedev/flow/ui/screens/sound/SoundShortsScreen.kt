@@ -170,6 +170,7 @@ class SoundShortsViewModel
                         var best = emptyList<ShortVideo>()
                         val sources: List<suspend () -> List<ShortVideo>> =
                             buildList {
+                                if (videoId.isNotBlank()) add { YouTube.soundShortsFromPanel(videoId).mapped("panel") }
                                 for (id in candidateIds) {
                                     add { YouTube.soundShortsFromPage(id, feed = true).mapped("feed page $id") }
                                     add { YouTube.soundShortsViaAudioPivot(id).mapped("pivot $id") }

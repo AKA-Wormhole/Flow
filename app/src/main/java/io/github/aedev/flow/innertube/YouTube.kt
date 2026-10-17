@@ -3038,7 +3038,7 @@ object YouTube {
         var token = first.nextPageToken()
         var pages = 0
         while (token != null && pages++ < 8) {
-            val page = channelBrowseJson(continuation = token).jsonObject
+            val page = runCatching { channelBrowseJson(continuation = token).jsonObject }.getOrNull() ?: break
             val before = reels.size
             page.toReelLockups().ifEmpty { page.looseReelLockups() }.forEach { reels.putIfAbsent(it.id, it) }
             if (reels.size == before) break
@@ -3176,7 +3176,7 @@ object YouTube {
             val node = find(response)
             val text = node?.toString().orEmpty()
             synchronized(soundShape) {
-                soundShape.append("  sound button: ${if (node == null) "NOT IN RESPONSE" else text.take(700)}\n")
+                soundShape.append("  sound button: ${if (node == null) "NOT IN RESPONSE" else text.take(1800)}\n")
             }
             // The sound page link (/source/<id>/shorts) can sit anywhere in the response, so search all of it first.
             val everywhere =
@@ -3200,6 +3200,71 @@ object YouTube {
                 .distinct()
                 .toList()
         }.getOrDefault(emptyList())
+
+    /**
+     * Shorts using a reel's sound, read from the panel its sound button opens. For a song or reused audio the
+     * button does not link to a page: it opens an engagement panel whose content loads from a continuation
+     * token (or is embedded). Each token is tried against browse and next; outcomes go to the sound log.
+     */
+    suspend fun soundShortsFromPanel(videoId: String): Result<List<ReelLockup>> =
+        runCatching {
+            ensureVisitorData()
+            val response = innerTube.reelItemWatch(client = WEB, videoId = videoId).body<JsonObject>()
+
+            fun findButton(e: JsonElement): JsonElement? =
+                when (e) {
+                    is JsonObject -> e["pivotButtonRenderer"] ?: e["pivotButtonViewModel"] ?: e.values.firstNotNullOfOrNull(::findButton)
+                    is JsonArray -> e.firstNotNullOfOrNull(::findButton)
+                    else -> null
+                }
+
+            fun tokens(e: JsonElement): List<String> =
+                when (e) {
+                    is JsonObject -> {
+                        listOfNotNull(e["continuationCommand"].objectOrNull()?.get("token").stringOrNull()) +
+                            e.values.flatMap(::tokens)
+                    }
+
+                    is JsonArray -> {
+                        e.flatMap(::tokens)
+                    }
+
+                    else -> {
+                        emptyList()
+                    }
+                }
+            val button = findButton(response) ?: error("No sound button in the reel's details")
+            val found = tokens(button).distinct()
+
+            fun note(line: String) = synchronized(soundShape) { soundShape.append("  panel: $line\n") }
+            note("continuation tokens on the button: ${found.size}")
+            var best = (button as? JsonObject)?.toReelLockups().orEmpty()
+            if (best.isNotEmpty()) note("embedded reels: ${best.size}")
+            for (token in found) {
+                val viaBrowse = runCatching { soundPages(channelBrowseJson(continuation = token).jsonObject) }
+                note(
+                    "browse token -> ${viaBrowse.exceptionOrNull()?.let {
+                        "${it.javaClass.simpleName} ${it.message?.take(
+                            60,
+                        )}"
+                    } ?: "${viaBrowse.getOrNull()?.size} reels"}",
+                )
+                if ((viaBrowse.getOrNull()?.size ?: 0) > best.size) best = viaBrowse.getOrNull().orEmpty()
+                val viaNext =
+                    runCatching {
+                        soundPages(innerTube.next(WEB, null, null, null, null, null, token).body<JsonObject>())
+                    }
+                note(
+                    "next token -> ${viaNext.exceptionOrNull()?.let {
+                        "${it.javaClass.simpleName} ${it.message?.take(
+                            60,
+                        )}"
+                    } ?: "${viaNext.getOrNull()?.size} reels"}",
+                )
+                if ((viaNext.getOrNull()?.size ?: 0) > best.size) best = viaNext.getOrNull().orEmpty()
+            }
+            best
+        }
 
     /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
     suspend fun soundShorts(
