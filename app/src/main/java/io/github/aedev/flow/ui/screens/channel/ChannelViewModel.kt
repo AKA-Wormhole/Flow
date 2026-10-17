@@ -192,7 +192,9 @@ class ChannelViewModel
                     result!!.fold(
                         onSuccess = { products -> storeState.value = ChannelStoreUiState(products = products, loaded = true) },
                         onFailure = { error ->
-                            if (error is kotlinx.coroutines.CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) {
+                            if (error is kotlinx.coroutines.CancellationException &&
+                                error !is kotlinx.coroutines.TimeoutCancellationException
+                            ) {
                                 throw error
                             }
                             Log.e(TAG, "Failed to load store", error)
