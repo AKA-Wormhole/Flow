@@ -66,7 +66,57 @@ import javax.inject.Inject
 data class SoundShortsState(
     val loading: Boolean = true,
     val shorts: List<ShortVideo> = emptyList(),
+    val debug: String = "",
 )
+
+/** One line per attempt, saying plainly whether YouTube rejected it, the network failed, or it came back empty. */
+internal fun describeSoundAttempt(
+    name: String,
+    error: Throwable?,
+    count: Int,
+): String =
+    when {
+        error is io.ktor.client.plugins.ResponseException -> {
+            val code = error.response.status.value
+            val kind = if (code in 500..599) "YOUTUBE SERVER ERROR" else "REJECTED BY YOUTUBE"
+            "$name: $kind (HTTP $code ${error.response.status.description})"
+        }
+
+        error is java.io.IOException -> {
+            "$name: NETWORK FAILED (${error.javaClass.simpleName}: ${error.message?.take(80)})"
+        }
+
+        error != null -> {
+            "$name: FAILED (${error.javaClass.simpleName}: ${error.message?.take(80)})"
+        }
+
+        count == 0 -> {
+            "$name: OK but YouTube returned 0 shorts"
+        }
+
+        else -> {
+            "$name: OK, $count shorts"
+        }
+    }
+
+internal fun soundLogHeader(
+    videoId: String,
+    browseId: String,
+    params: String,
+): String {
+    val locale = YouTube.locale
+    return buildString {
+        appendLine("FLOW SOUND SCREEN")
+        appendLine("Video: $videoId")
+        appendLine(
+            "Sound link in short: ${if (browseId.isBlank()) "none" else browseId}, params ${if (params.isBlank()) "none" else "present"}",
+        )
+        appendLine("Signed in: ${YouTube.cookie != null}")
+        appendLine("Locale: hl=${locale.hl}, gl=${locale.gl}")
+        appendLine("Visitor data present: ${!YouTube.visitorData.isNullOrBlank()}")
+        appendLine()
+    }
+}
 
 @HiltViewModel
 class SoundShortsViewModel
@@ -77,6 +127,8 @@ class SoundShortsViewModel
         private val _state = MutableStateFlow(SoundShortsState())
         val state: StateFlow<SoundShortsState> = _state
         private var loadedKey: String? = null
+        var debug: String = ""
+            private set
 
         fun load(
             browseId: String,
@@ -101,38 +153,56 @@ class SoundShortsViewModel
                                 .orEmpty()
                                 .map { it.toShortVideo() }
                         }
-                        // YouTube's own sound feed is the reel's /source/ page, so it goes first.
-                        var found =
-                            if (videoId.isBlank()) {
-                                emptyList()
-                            } else {
-                                val source = YouTube.soundEndpointForVideo(videoId).getOrNull()
-                                fetch(source?.first.orEmpty(), source?.second)
+                        // Try each source in turn and keep the largest result; a lone reel usually means the
+                        // source only returned the seed, so the next one gets a chance too.
+                        val log = StringBuilder(soundLogHeader(videoId, browseId, params))
+
+                        fun Result<List<io.github.aedev.flow.innertube.pages.reel.ReelLockup>>.mapped(name: String): List<ShortVideo> {
+                            val list = getOrNull().orEmpty().map { it.toShortVideo() }
+                            log.appendLine(describeSoundAttempt(name, exceptionOrNull(), list.size))
+                            return list
+                        }
+                        var best = emptyList<ShortVideo>()
+                        val sources: List<suspend () -> List<ShortVideo>> =
+                            buildList {
+                                if (videoId.isNotBlank()) {
+                                    add {
+                                        val source = YouTube.soundEndpointForVideo(videoId).getOrNull()
+                                        if (source == null) {
+                                            log.appendLine("resolve: FAILED (YouTube gave no sound page for this short)")
+                                            emptyList()
+                                        } else {
+                                            YouTube.soundShorts(source.first, source.second).mapped("resolve")
+                                        }
+                                    }
+                                    add { YouTube.soundShortsFromPage(videoId).mapped("page") }
+                                    add { YouTube.soundShortsViaAudioPivot(videoId).mapped("pivot") }
+                                }
+                                if (browseId.isNotBlank()) add { YouTube.soundShorts(browseId, params).mapped("link") }
+                                if (videoId.isNotBlank()) {
+                                    add {
+                                        val overlay = YouTube.reelOverlay(videoId).getOrNull()
+                                        val id = overlay?.soundBrowseId.orEmpty()
+                                        if (id.isBlank()) {
+                                            log.appendLine("overlay: FAILED (short details contain no sound link)")
+                                            emptyList()
+                                        } else {
+                                            YouTube.soundShorts(id, overlay?.soundParams).mapped("overlay")
+                                        }
+                                    }
+                                }
                             }
-                        if (found.isEmpty() && videoId.isNotBlank()) {
-                            found =
-                                YouTube
-                                    .soundShortsFromPage(videoId)
-                                    .getOrNull()
-                                    .orEmpty()
-                                    .map { it.toShortVideo() }
+                        for (source in sources) {
+                            val result = source()
+                            if (result.size > best.size) best = result
+                            if (best.size > 1) break
                         }
-                        if (found.isEmpty() && videoId.isNotBlank()) {
-                            found =
-                                YouTube
-                                    .soundShortsViaAudioPivot(videoId)
-                                    .getOrNull()
-                                    .orEmpty()
-                                    .map { it.toShortVideo() }
-                        }
-                        if (found.isEmpty()) found = fetch(browseId, params)
-                        if (found.isEmpty() && videoId.isNotBlank()) {
-                            val overlay = YouTube.reelOverlay(videoId).getOrNull()
-                            found = fetch(overlay?.soundBrowseId.orEmpty(), overlay?.soundParams)
-                        }
+                        debug = log.toString()
+                        android.util.Log.w("SoundShorts", debug)
+                        val found = best
                         found
                     }
-                _state.value = SoundShortsState(loading = false, shorts = reels)
+                _state.value = SoundShortsState(loading = false, shorts = reels, debug = debug)
             }
         }
 
@@ -171,7 +241,24 @@ fun SoundShortsScreen(
                 }
 
                 state.shorts.isEmpty() -> {
-                    Text(stringResource(R.string.sound_empty), modifier = Modifier.align(Alignment.Center))
+                    Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(stringResource(R.string.sound_empty))
+                        Text(
+                            state.debug,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 12.dp),
+                        )
+                        val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                        androidx.compose.material3.TextButton(
+                            onClick = {
+                                clipboard.setText(
+                                    androidx.compose.ui.text
+                                        .AnnotatedString(state.debug),
+                                )
+                            },
+                        ) { Text("Copy log") }
+                    }
                 }
 
                 else -> {

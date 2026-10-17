@@ -88,6 +88,7 @@ import io.github.aedev.flow.innertube.pages.explore.exploreShelves
 import io.github.aedev.flow.innertube.pages.explore.ranked
 import io.github.aedev.flow.innertube.pages.explore.toExploreDestinationShell
 import io.github.aedev.flow.innertube.pages.explore.trendingVideoChart
+import io.github.aedev.flow.innertube.pages.objectOrNull
 import io.github.aedev.flow.innertube.pages.parseYouTubeViewCount
 import io.github.aedev.flow.innertube.pages.reel.ReelLockup
 import io.github.aedev.flow.innertube.pages.reel.ReelOverlay
@@ -108,6 +109,7 @@ import io.github.aedev.flow.innertube.pages.search.SearchResultsPage
 import io.github.aedev.flow.innertube.pages.search.SearchSuggestion
 import io.github.aedev.flow.innertube.pages.search.parseSearchSuggestions
 import io.github.aedev.flow.innertube.pages.search.toSearchResultsPage
+import io.github.aedev.flow.innertube.pages.stringOrNull
 import io.github.aedev.flow.innertube.pages.toCommentRepliesPage
 import io.github.aedev.flow.innertube.pages.toVideoCommentsPage
 import io.github.aedev.flow.innertube.pages.toVideoDescriptionPage
@@ -2953,7 +2955,7 @@ object YouTube {
                 }
             }
             check(end > start) { "Unreadable page data" }
-            Json.parseToJsonElement(html.substring(start, end + 1)).jsonObject.toReelLockups()
+            soundPages(Json.parseToJsonElement(html.substring(start, end + 1)).jsonObject)
         }
 
     /**
@@ -2974,6 +2976,46 @@ object YouTube {
             emptyList()
         }
 
+    /** The first page of a sound feed plus the pages after it; the feed opens with only a few reels. */
+    private suspend fun soundPages(first: JsonObject): List<ReelLockup> {
+        val reels = LinkedHashMap<String, ReelLockup>()
+        first.toReelLockups().forEach { reels.putIfAbsent(it.id, it) }
+        var token = first.nextPageToken()
+        var pages = 0
+        while (token != null && pages++ < 8) {
+            val page = channelBrowseJson(continuation = token).jsonObject
+            val before = reels.size
+            page.toReelLockups().forEach { reels.putIfAbsent(it.id, it) }
+            if (reels.size == before) break
+            token = page.nextPageToken()
+        }
+        return reels.values.toList()
+    }
+
+    private fun JsonElement.nextPageToken(): String? =
+        when (this) {
+            is JsonObject -> {
+                this["continuationItemRenderer"]
+                    .objectOrNull()
+                    ?.get("continuationEndpoint")
+                    .objectOrNull()
+                    ?.get("continuationCommand")
+                    .objectOrNull()
+                    ?.get("token")
+                    .stringOrNull()
+                    ?.takeIf { it.isNotBlank() }
+                    ?: values.firstNotNullOfOrNull { it.nextPageToken() }
+            }
+
+            is JsonArray -> {
+                firstNotNullOfOrNull { it.nextPageToken() }
+            }
+
+            else -> {
+                null
+            }
+        }
+
     /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
     suspend fun soundShorts(
         browseId: String,
@@ -2981,9 +3023,7 @@ object YouTube {
     ): Result<List<io.github.aedev.flow.innertube.pages.reel.ReelLockup>> =
         runCatching {
             ensureVisitorData()
-            channelBrowseJson(browseId = browseId, params = params?.takeIf { it.isNotBlank() })
-                .jsonObject
-                .toReelLockups()
+            soundPages(channelBrowseJson(browseId = browseId, params = params?.takeIf { it.isNotBlank() }).jsonObject)
         }
 
     /** Title, channel, counts and sound for one reel — everything the sequence leaves out. */
