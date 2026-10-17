@@ -29,6 +29,8 @@ data class PollChoice(
     val text: String,
     val voteRatio: Float? = null,
     val voteCountText: String? = null,
+    /** The action token that casts a vote for this choice; null when signed out. */
+    val voteAction: String? = null,
 )
 
 /**
@@ -86,6 +88,7 @@ private fun JsonObject.poll(): PostAttachment.Poll? {
                     voteCountText =
                         choice["numVotes"].youtubeText()
                             ?: choice["votePercentageIfSelected"].youtubeText(),
+                    voteAction = choice["selectServiceEndpoint"].commentActionToken(),
                 )
             }
     return choices.takeIf { it.isNotEmpty() }?.let {

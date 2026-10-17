@@ -826,6 +826,27 @@ class InnerTube {
         }
     }
 
+    /** The recorded chat of a finished stream or premiere; [offsetMs] is the video position it should follow. */
+    suspend fun getLiveChatReplay(
+        continuation: String,
+        offsetMs: Long? = null,
+    ) = withRetry {
+        val client = YouTubeClient.WEB
+        httpClient.post("https://www.youtube.com/youtubei/v1/live_chat/get_live_chat_replay") {
+            webYouTubeHeaders(client)
+            setBody(
+                GetLiveChatBody(
+                    context = client.toContext(locale, if (isSignedIn) null else visitorData, null),
+                    continuation = continuation,
+                    currentPlayerState =
+                        offsetMs?.let {
+                            GetLiveChatBody.CurrentPlayerState(playerOffsetMs = it.toString())
+                        },
+                ),
+            )
+        }
+    }
+
     suspend fun getSearchSuggestions(
         client: YouTubeClient,
         input: String,
@@ -1002,6 +1023,71 @@ class InnerTube {
         io.github.aedev.flow.innertube.models.body.CommentActionBody(
             context = client.toContext(locale, v, null),
             actions = listOf(token),
+        )
+    }
+
+    /** Posts a chat message as the account; [params] comes from the chat's own send button. */
+    suspend fun accountSendLiveChatMessage(
+        params: String,
+        text: String,
+        clientMessageId: String,
+        client: YouTubeClient = YouTubeClient.WEB,
+    ) = mainSitePost(client, "live_chat/send_message", login = true) { v ->
+        io.github.aedev.flow.innertube.models.body.SendLiveChatMessageBody(
+            context = client.toContext(locale, v, null),
+            params = params,
+            richMessage =
+                io.github.aedev.flow.innertube.models.body.SendLiveChatMessageBody.RichMessage(
+                    listOf(
+                        io.github.aedev.flow.innertube.models.body.SendLiveChatMessageBody
+                            .Segment(text),
+                    ),
+                ),
+            clientMessageId = clientMessageId,
+        )
+    }
+
+    suspend fun accountGetAddToPlaylist(
+        videoId: String,
+        client: YouTubeClient = YouTubeClient.WEB,
+    ) = mainSitePost(client, "playlist/get_add_to_playlist", login = true) { v ->
+        io.github.aedev.flow.innertube.models.body.GetAddToPlaylistBody(
+            context = client.toContext(locale, v, null),
+            videoIds = listOf(videoId),
+        )
+    }
+
+    suspend fun accountEditPlaylist(
+        playlistId: String,
+        action: io.github.aedev.flow.innertube.models.body.AccountPlaylistAction,
+        client: YouTubeClient = YouTubeClient.WEB,
+    ) = mainSitePost(client, "browse/edit_playlist", login = true) { v ->
+        io.github.aedev.flow.innertube.models.body.AccountEditPlaylistBody(
+            context = client.toContext(locale, v, null),
+            playlistId = playlistId.removePrefix("VL"),
+            actions = listOf(action),
+        )
+    }
+
+    suspend fun accountCreatePlaylist(
+        title: String,
+        videoId: String,
+        client: YouTubeClient = YouTubeClient.WEB,
+    ) = mainSitePost(client, "playlist/create", login = true) { v ->
+        io.github.aedev.flow.innertube.models.body.CreatePlaylistBody(
+            context = client.toContext(locale, v, null),
+            title = title,
+            videoIds = listOf(videoId),
+        )
+    }
+
+    suspend fun accountModifyChannelPreference(
+        params: String,
+        client: YouTubeClient = YouTubeClient.WEB,
+    ) = mainSitePost(client, "notification/modify_channel_preference", login = true) { v ->
+        io.github.aedev.flow.innertube.models.body.ModifyChannelPreferenceBody(
+            context = client.toContext(locale, v, null),
+            params = params,
         )
     }
 

@@ -80,6 +80,5 @@ private fun HomeChip.label(): String =
         HomeChip.NewToYou -> stringResource(R.string.home_chip_new_to_you)
         HomeChip.RecentlyUploaded -> stringResource(R.string.home_chip_recently_uploaded)
         HomeChip.Mixes -> stringResource(R.string.home_chip_mixes)
-        HomeChip.Live -> stringResource(R.string.home_chip_live)
         HomeChip.Watched -> stringResource(R.string.home_chip_watched)
     }

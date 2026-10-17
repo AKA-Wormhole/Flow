@@ -26,6 +26,17 @@ fun SaveVideoSheet(
     val playlists by viewModel.playlists.collectAsStateWithLifecycle()
     val watchLaterVideos by viewModel.watchLaterVideos.collectAsStateWithLifecycle()
     val savedIds by viewModel.savedIds.collectAsStateWithLifecycle()
+    val youtubeOptions by viewModel.youtubeOptions.collectAsStateWithLifecycle()
+    val message by viewModel.message.collectAsStateWithLifecycle()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(message) {
+        message?.let {
+            android.widget.Toast
+                .makeText(context, it, android.widget.Toast.LENGTH_SHORT)
+                .show()
+            viewModel.messageShown()
+        }
+    }
     var showCreateDialog by remember { mutableStateOf(false) }
 
     LaunchedEffect(video.id) { viewModel.loadMembership(video.id) }
@@ -43,6 +54,17 @@ fun SaveVideoSheet(
             thumbnailUrl = watchLaterVideos.firstOrNull()?.thumbnailUrl.orEmpty(),
             isSaved = PlaylistRepository.WATCH_LATER_ID in savedIds,
         )
+    // The account's own YouTube playlists (including its Watch later), after the on-device ones.
+    val youtubeEntries =
+        youtubeOptions.map { option ->
+            CollectionSheetEntry(
+                id = YT_PREFIX + option.id,
+                name = "YouTube · " + option.title,
+                supporting = "",
+                thumbnailUrl = "",
+                isSaved = (YT_PREFIX + option.id) in savedIds,
+            )
+        }
     val entries =
         listOf(watchLaterEntry) +
             playlists.map { playlist ->
@@ -58,7 +80,7 @@ fun SaveVideoSheet(
                     thumbnailUrl = playlist.thumbnailUrl,
                     isSaved = playlist.id in savedIds,
                 )
-            }
+            } + youtubeEntries
 
     SaveToCollectionSheet(
         title = stringResource(R.string.save_to),

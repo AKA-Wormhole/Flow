@@ -22,6 +22,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +71,18 @@ fun HistoryScreen(
 
     var showClearDialog by remember { mutableStateOf(false) }
     var showClearShortsDialog by remember { mutableStateOf(false) }
+    var showClearYoutubeDialog by remember { mutableStateOf(false) }
+    val youtubeSignedIn = io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn
+    val youtubeMessage by viewModel.youtubeMessage.collectAsStateWithLifecycle()
+    val toastContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(youtubeMessage) {
+        youtubeMessage?.let {
+            android.widget.Toast
+                .makeText(toastContext, it, android.widget.Toast.LENGTH_LONG)
+                .show()
+            viewModel.youtubeMessageShown()
+        }
+    }
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
@@ -105,6 +118,26 @@ fun HistoryScreen(
                                             label = stringResource(R.string.history_delete_shorts),
                                             enabled = uiState.historyEntries.any { it.isShort },
                                             onClick = { showClearShortsDialog = true },
+                                        ),
+                                    )
+                                }
+                                if (youtubeSignedIn) {
+                                    add(
+                                        FlowTopBarMenuItem(
+                                            label = "Clear YouTube watch history",
+                                            onClick = { showClearYoutubeDialog = true },
+                                        ),
+                                    )
+                                    add(
+                                        FlowTopBarMenuItem(
+                                            label = "Pause YouTube history",
+                                            onClick = { viewModel.setYoutubeHistoryPaused(true) },
+                                        ),
+                                    )
+                                    add(
+                                        FlowTopBarMenuItem(
+                                            label = "Resume YouTube history",
+                                            onClick = { viewModel.setYoutubeHistoryPaused(false) },
                                         ),
                                     )
                                 }
@@ -220,6 +253,29 @@ fun HistoryScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showClearDialog = false }) {
+                    Text(stringResource(R.string.cancel))
+                }
+            },
+        )
+    }
+
+    if (showClearYoutubeDialog) {
+        FlowAlertDialog(
+            onDismissRequest = { showClearYoutubeDialog = false },
+            title = { Text("Clear YouTube watch history?") },
+            text = { Text("This permanently deletes the watch history of your YouTube account, on every device. It can't be undone.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.clearYoutubeHistory()
+                        showClearYoutubeDialog = false
+                    },
+                ) {
+                    Text(stringResource(R.string.clear))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearYoutubeDialog = false }) {
                     Text(stringResource(R.string.cancel))
                 }
             },

@@ -22,6 +22,29 @@ internal object HomeChipParams {
     const val SESSION_TOPICS = 5
 }
 
+/** Live and Shorts have their own place (the Shorts screen), so YouTube's chips for them stay off Home. */
+internal fun isLiveOrShortsChip(title: String): Boolean = title.trim().lowercase() in LIVE_OR_SHORTS_TITLES
+
+private val LIVE_OR_SHORTS_TITLES =
+    setOf(
+        "live",
+        "shorts",
+        "en vivo",
+        "en direct",
+        "direct",
+        "ao vivo",
+        "dal vivo",
+        "live-übertragung",
+        "kurzvideos",
+        "lives",
+        "लाइव",
+        "शॉर्ट्स",
+        "短视频",
+        "直播",
+        "ライブ",
+        "ショート",
+    )
+
 /**
  * The chips above Home: "All" (the app's own feed) followed by YouTube's own chips, in YouTube's
  * order and wording. Empty chips are left out.
@@ -31,7 +54,7 @@ internal fun visibleChips(
     emptyKeys: Set<String>,
     selected: String,
 ): List<HomeChip> {
-    val all = listOf<HomeChip>(HomeChip.All) + titles.distinct().map(HomeChip::YouTube)
+    val all = listOf<HomeChip>(HomeChip.All) + titles.filterNot(::isLiveOrShortsChip).distinct().map(HomeChip::YouTube)
     return all.filter { chip -> chip == HomeChip.All || chip.key == selected || chip.key !in emptyKeys }
 }
 

@@ -61,6 +61,43 @@ class CommentReplyState {
     /** New text for comments edited this session, by comment id. */
     val editedText = mutableStateMapOf<String, String>()
 
+    /** This session's vote per comment id (0 none, 1 liked, 2 disliked); overrides what the page loaded with. */
+    val votes = mutableStateMapOf<String, Int>()
+
+    /**
+     * Applies [target] (0, 1 or 2) right away and sends it to YouTube; on failure the old vote is restored
+     * and [onError] gets the reason. Switching like to dislike undoes the first, then sends the second.
+     */
+    fun vote(
+        scope: kotlinx.coroutines.CoroutineScope,
+        comment: Comment,
+        target: Int,
+        onError: (String) -> Unit,
+    ) {
+        val previous = votes[comment.id] ?: comment.likeState
+        if (previous == target) return
+        votes[comment.id] = target
+        scope.launch {
+            val steps =
+                buildList {
+                    if (previous == 1) add(io.github.aedev.flow.account.AccountActions.CommentVote.UNLIKE)
+                    if (previous == 2) add(io.github.aedev.flow.account.AccountActions.CommentVote.UNDISLIKE)
+                    if (target == 1) add(io.github.aedev.flow.account.AccountActions.CommentVote.LIKE)
+                    if (target == 2) add(io.github.aedev.flow.account.AccountActions.CommentVote.DISLIKE)
+                }
+            for (step in steps) {
+                val result =
+                    io.github.aedev.flow.account.AccountActions
+                        .voteComment(comment.id, step)
+                if (result.isFailure) {
+                    votes[comment.id] = previous
+                    onError(result.exceptionOrNull()?.message ?: "Couldn't rate this comment")
+                    return@launch
+                }
+            }
+        }
+    }
+
     fun startReply(comment: Comment) {
         editTarget = null
         target = comment

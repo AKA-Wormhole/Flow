@@ -238,6 +238,17 @@ fun SoundShortsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = null) }
                 },
+                actions = {
+                    val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+                    androidx.compose.material3.TextButton(
+                        onClick = {
+                            clipboard.setText(
+                                androidx.compose.ui.text
+                                    .AnnotatedString(state.debug),
+                            )
+                        },
+                    ) { Text("Copy log") }
+                },
             )
         },
     ) { padding ->

@@ -39,6 +39,20 @@ data class LiveChatSeedResponse(
 
     // The seed continuation token
     fun seedContinuation(): String? =
-        contents?.twoColumnWatchNextResults?.conversationBar?.liveChatRenderer
-            ?.continuations?.firstOrNull()?.reloadContinuationData?.continuation
+        contents
+            ?.twoColumnWatchNextResults
+            ?.conversationBar
+            ?.liveChatRenderer
+            ?.continuations
+            ?.firstOrNull()
+            ?.reloadContinuationData
+            ?.continuation
+
+    /** The stream has ended and this chat is its recording, read through `get_live_chat_replay`. */
+    fun isReplay(): Boolean =
+        contents
+            ?.twoColumnWatchNextResults
+            ?.conversationBar
+            ?.liveChatRenderer
+            ?.isReplay == true
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ThumbUp
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.ThumbUp
@@ -25,6 +26,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -42,6 +44,7 @@ import io.github.aedev.flow.innertube.pages.renderer.CommunityPost
 import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.utils.ThumbnailUrlResolver
 import io.github.aedev.flow.utils.formatRichText
+import kotlinx.coroutines.launch
 
 /**
  * One community post, laid out as YouTube lays it out: author, text, then the attachment running the
@@ -146,11 +149,40 @@ fun CommunityPostCard(
                     .padding(horizontal = PostHorizontalPadding),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Liking sends to YouTube when the post came with action tokens (signed in); otherwise it is inert.
+            var liked by remember(post.id) { mutableStateOf(post.isLiked) }
+            val likeScope = rememberCoroutineScope()
+            val likeContext = androidx.compose.ui.platform.LocalContext.current
+            val canLike = post.likeAction != null && post.unlikeAction != null
             Icon(
-                imageVector = Icons.Outlined.ThumbUp,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(20.dp),
+                imageVector = if (liked) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
+                contentDescription = stringResource(R.string.like),
+                tint = if (liked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier =
+                    Modifier
+                        .size(24.dp)
+                        .clip(androidx.compose.foundation.shape.CircleShape)
+                        .clickable(enabled = canLike) {
+                            val target = !liked
+                            val token = if (target) post.likeAction else post.unlikeAction
+                            liked = target
+                            likeScope.launch {
+                                val result =
+                                    token?.let {
+                                        io.github.aedev.flow.account.AccountActions
+                                            .sendAction(it)
+                                    }
+                                if (result == null || result.isFailure) {
+                                    liked = !target
+                                    android.widget.Toast
+                                        .makeText(
+                                            likeContext,
+                                            result?.exceptionOrNull()?.message ?: "Couldn't like",
+                                            android.widget.Toast.LENGTH_SHORT,
+                                        ).show()
+                                }
+                            }
+                        },
             )
             Spacer(Modifier.width(8.dp))
             Text(

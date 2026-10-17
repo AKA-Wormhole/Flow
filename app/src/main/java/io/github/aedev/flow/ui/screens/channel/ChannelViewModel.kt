@@ -367,6 +367,19 @@ class ChannelViewModel
             }
         }
 
+        /** Writes a comment on the community post whose comments are open, as the signed-in account. */
+        fun postCommunityComment(
+            text: String,
+            onDone: (Result<Unit>) -> Unit,
+        ) {
+            viewModelScope.launch {
+                onDone(
+                    io.github.aedev.flow.account.AccountActions
+                        .postComment(io.github.aedev.flow.innertube.YouTube.COMMUNITY_COMMENT_KEY, text),
+                )
+            }
+        }
+
         fun setNotificationState(enabled: Boolean) {
             viewModelScope.launch(PerformanceDispatcher.diskIO) {
                 val state = _uiState.value

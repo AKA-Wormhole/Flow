@@ -329,6 +329,41 @@ class HistoryViewModel
         fun removeFromHistory(videoId: String) {
             viewModelScope.launch {
                 viewHistory.clearVideoHistory(videoId)
+                // Best effort: also drop it from the account's YouTube history when that entry was loaded.
+                if (io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn) {
+                    io.github.aedev.flow.account.AccountHistory
+                        .remove(videoId)
+                }
+            }
+        }
+
+        private val _youtubeMessage = MutableStateFlow<String?>(null)
+
+        /** The outcome of the last YouTube-history action, for a one-shot toast. */
+        val youtubeMessage: StateFlow<String?> = _youtubeMessage.asStateFlow()
+
+        fun youtubeMessageShown() {
+            _youtubeMessage.value = null
+        }
+
+        fun clearYoutubeHistory() =
+            youtubeAction("Cleared YouTube watch history") {
+                io.github.aedev.flow.account.AccountHistory
+                    .clearAll()
+            }
+
+        fun setYoutubeHistoryPaused(paused: Boolean) =
+            youtubeAction(if (paused) "Paused YouTube watch history" else "Resumed YouTube watch history") {
+                io.github.aedev.flow.account.AccountHistory
+                    .setPaused(paused)
+            }
+
+        private fun youtubeAction(
+            success: String,
+            block: suspend () -> Result<Unit>,
+        ) {
+            viewModelScope.launch {
+                _youtubeMessage.value = block().fold({ success }, { it.message ?: "YouTube didn't accept that" })
             }
         }
 

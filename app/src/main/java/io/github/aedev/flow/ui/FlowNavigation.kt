@@ -149,6 +149,15 @@ fun NavGraphBuilder.flowAppGraph(
                 mediaNavigator.openChannel(channelId)
             },
             onSoundClick = { id, params, title, videoId -> navController.openSound(id, params, title, videoId) },
+            onOpenLive = { navController.navigate(LIVE_FEED_ROUTE) { launchSingleTop = true } },
+        )
+    }
+
+    composable(LIVE_FEED_ROUTE) {
+        currentRoute.value = LIVE_FEED_ROUTE
+        io.github.aedev.flow.ui.screens.live.LiveFeedScreen(
+            onBack = { navController.popBackStack() },
+            onChannelClick = { channelId -> mediaNavigator.openChannel(channelId) },
         )
     }
 
@@ -610,3 +619,6 @@ fun NavGraphBuilder.flowAppGraph(
         onMusicStarted = onMusicStarted,
     )
 }
+
+/** The Live feed: live streams as a vertical, Shorts-style pager. Reached from the Shorts screen while a short is paused. */
+internal const val LIVE_FEED_ROUTE = "live_feed"

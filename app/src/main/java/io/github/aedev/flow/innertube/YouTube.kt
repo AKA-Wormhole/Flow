@@ -909,6 +909,9 @@ object YouTube {
             )
         }
 
+    /** Where the open community post's create-comment token is kept; one post is open at a time. */
+    const val COMMUNITY_COMMENT_KEY = "community-post-open"
+
     private suspend fun communityPostCommentsPage(
         postId: String? = null,
         params: String? = null,
@@ -922,7 +925,14 @@ object YouTube {
                 params = params,
                 continuation = continuation,
             )
-        return Json.parseToJsonElement(response.bodyAsText()).toCommunityCommentsPage()
+        val root = Json.parseToJsonElement(response.bodyAsText())
+        // Signed-in actions on post comments (vote, reply, write, edit, delete) use tokens carried by this response.
+        val actions = io.github.aedev.flow.account.AccountActions
+        if (continuation == null) actions.rememberCommentParams(COMMUNITY_COMMENT_KEY, root)
+        actions.rememberReplyParams(root)
+        actions.rememberOwnCommentActions(root)
+        actions.rememberCommentVoteActions(root)
+        return root.toCommunityCommentsPage()
     }
 
     private suspend fun channelVideosPage(
@@ -2528,6 +2538,8 @@ object YouTube {
                 .rememberReplyParams(root)
             io.github.aedev.flow.account.AccountActions
                 .rememberOwnCommentActions(root)
+            io.github.aedev.flow.account.AccountActions
+                .rememberCommentVoteActions(root)
             root.toVideoCommentsPage(ownVideoId)
         }
 
@@ -2541,6 +2553,8 @@ object YouTube {
                 .rememberReplyParams(root)
             io.github.aedev.flow.account.AccountActions
                 .rememberOwnCommentActions(root)
+            io.github.aedev.flow.account.AccountActions
+                .rememberCommentVoteActions(root)
             root.toCommentRepliesPage(ownVideoId)
         }
 
@@ -2560,6 +2574,26 @@ object YouTube {
             innerTube
                 .getLiveChat(continuation, offsetMs)
                 .body<io.github.aedev.flow.innertube.models.response.GetLiveChatResponse>()
+        }
+
+    suspend fun liveChatReplay(
+        continuation: String,
+        offsetMs: Long? = null,
+    ): Result<io.github.aedev.flow.innertube.models.response.GetLiveChatResponse> =
+        runCatching {
+            innerTube
+                .getLiveChatReplay(continuation, offsetMs)
+                .body<io.github.aedev.flow.innertube.models.response.GetLiveChatResponse>()
+        }
+
+    /** Seed token for [videoId]'s chat, and whether it is a recording (replay) rather than a live chat. */
+    suspend fun liveChatSeed(videoId: String): Result<Pair<String?, Boolean>> =
+        runCatching {
+            val seed =
+                innerTube
+                    .nextForLiveChat(videoId)
+                    .body<io.github.aedev.flow.innertube.models.response.LiveChatSeedResponse>()
+            seed.seedContinuation() to seed.isReplay()
         }
 
     suspend fun watchMetadata(videoId: String): Result<io.github.aedev.flow.innertube.models.response.WatchMetadataResponse> =
@@ -3233,12 +3267,36 @@ object YouTube {
                         emptyList()
                     }
                 }
-            val button = findButton(response) ?: error("No sound button in the reel's details")
-            val found = tokens(button).distinct()
+            // The button only names its panel ("engagement-panel-shorts-audio-pivot"); the panel itself, with the
+            // token or reels that fill it, sits elsewhere in the response or on the reel's web page.
+            val pageData =
+                runCatching { parseInitialData(innerTube.soundPageHtml(WEB, "https://www.youtube.com/shorts/$videoId")) }.getOrNull()
+            val ids = LinkedHashSet<String>()
+
+            fun panels(e: JsonElement): List<JsonObject> =
+                when (e) {
+                    is JsonObject -> {
+                        val id = e["panelIdentifier"].stringOrNull() ?: e["targetId"].stringOrNull()
+                        if (id != null) ids.add(id)
+                        (if (id?.contains("audio-pivot") == true) listOf(e) else emptyList()) + e.values.flatMap(::panels)
+                    }
+
+                    is JsonArray -> {
+                        e.flatMap(::panels)
+                    }
+
+                    else -> {
+                        emptyList()
+                    }
+                }
+            val audioPanels = listOfNotNull<JsonElement>(response, pageData).flatMap(::panels)
 
             fun note(line: String) = synchronized(soundShape) { soundShape.append("  panel: $line\n") }
-            note("continuation tokens on the button: ${found.size}")
-            var best = (button as? JsonObject)?.toReelLockups().orEmpty()
+            note("ids seen in response and page: ${ids.take(12)}; pageData=${pageData != null}")
+            note("audio pivot panels found: ${audioPanels.size}")
+            val found = audioPanels.flatMap(::tokens).distinct()
+            note("continuation tokens in them: ${found.size}")
+            var best = audioPanels.flatMap { it.toReelLockups() }.distinctBy { it.id }
             if (best.isNotEmpty()) note("embedded reels: ${best.size}")
             for (token in found) {
                 val viaBrowse = runCatching { soundPages(channelBrowseJson(continuation = token).jsonObject) }
@@ -3265,6 +3323,38 @@ object YouTube {
             }
             best
         }
+
+    /** The ytInitialData object embedded in a youtube.com page. */
+    private fun parseInitialData(html: String): JsonObject {
+        val marker = html.indexOf("ytInitialData")
+        check(marker >= 0) { "No page data" }
+        val start = html.indexOf('{', marker)
+        var depth = 0
+        var inString = false
+        var escaped = false
+        var end = -1
+        for (i in start until html.length) {
+            val c = html[i]
+            if (inString) {
+                if (escaped) {
+                    escaped = false
+                } else if (c == '\\') {
+                    escaped = true
+                } else if (c == '"') {
+                    inString = false
+                }
+            } else if (c == '"') {
+                inString = true
+            } else if (c == '{') {
+                depth++
+            } else if (c == '}' && --depth == 0) {
+                end = i
+                break
+            }
+        }
+        check(end > start) { "Unreadable page data" }
+        return Json.parseToJsonElement(html.substring(start, end + 1)).jsonObject
+    }
 
     /** Every reel that uses one sound, from the sound page the reel's pivot button opens. */
     suspend fun soundShorts(

@@ -22,6 +22,10 @@ data class LiveChatMessage(
     val superChatAmount: String? = null,
     val superChatArgb: Int? = null,
     val superChatHeaderArgb: Int? = null,
+    // Super Sticker only: the artwork. The amount rides in [superChatAmount].
+    val stickerUrl: String? = null,
+    // Replay only: where in the video this message was sent, so it can follow the playhead.
+    val offsetMs: Long? = null,
 )
 
-enum class LiveChatMessageType { TEXT, SUPER_CHAT, MEMBERSHIP }
+enum class LiveChatMessageType { TEXT, SUPER_CHAT, MEMBERSHIP, STICKER }

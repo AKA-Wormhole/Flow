@@ -95,6 +95,13 @@ fun HomeScreen(
     val gridState = rememberLazyGridState()
     val coroutineScope = rememberCoroutineScope()
     val chips by viewModel.chips.collectAsStateWithLifecycle()
+    // "Live" from the paused-video pill: apply a request made before this screen was composed, then any later ones.
+    LaunchedEffect(Unit) {
+        HomeChipRequests.consume()?.let(viewModel::selectChip)
+        HomeChipRequests.events.collect {
+            HomeChipRequests.consume()?.let(viewModel::selectChip)
+        }
+    }
     // Each chip keeps its own scroll position for the session.
     val chipGridStates = remember { HashMap<String, LazyGridState>() }
     val activeGridState = if (chips.isAll) gridState else chipGridStates.getOrPut(chips.selected) { LazyGridState() }

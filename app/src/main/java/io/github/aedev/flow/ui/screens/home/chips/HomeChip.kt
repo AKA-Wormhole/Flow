@@ -45,11 +45,6 @@ internal sealed interface HomeChip {
         override val ttlMs = 6 * HOUR
     }
 
-    data object Live : HomeChip {
-        override val key = "live"
-        override val ttlMs = 10 * MINUTE
-    }
-
     data object Watched : HomeChip {
         override val key = "watched"
         override val ttlMs = 15 * MINUTE

@@ -19,6 +19,9 @@ import javax.inject.Inject
 
 private const val SHARING_TIMEOUT_MS = 5_000L
 
+/** Marks a sheet entry id as a YouTube-account playlist rather than a local one. */
+const val YT_PREFIX = "yt:"
+
 @HiltViewModel
 class SaveVideoViewModel
     @Inject
@@ -54,12 +57,63 @@ class SaveVideoViewModel
                     emptyList(),
                 )
 
+        private val _youtubeOptions = MutableStateFlow<List<io.github.aedev.flow.account.AccountPlaylists.Option>>(emptyList())
+
+        /** The signed-in account's own YouTube playlists for the current video; empty when signed out. */
+        val youtubeOptions: StateFlow<List<io.github.aedev.flow.account.AccountPlaylists.Option>> = _youtubeOptions.asStateFlow()
+
+        private val _message = MutableStateFlow<String?>(null)
+        val message: StateFlow<String?> = _message.asStateFlow()
+
+        fun messageShown() {
+            _message.value = null
+        }
+
+        /** One request: the account's YouTube playlists and which already hold the video. */
+        private fun loadYoutube(videoId: String) {
+            if (!io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn) return
+            viewModelScope.launch {
+                io.github.aedev.flow.account.AccountPlaylists
+                    .options(videoId)
+                    .onSuccess { list ->
+                        _youtubeOptions.value = list
+                        _savedIds.update { ids -> ids + list.filter { it.containsVideo }.map { YT_PREFIX + it.id } }
+                    }
+            }
+        }
+
+        /** Adds or removes [videoId] on YouTube for an entry id carrying [YT_PREFIX]. */
+        private fun toggleYoutube(
+            videoId: String,
+            entryId: String,
+        ) {
+            val playlistId = entryId.removePrefix(YT_PREFIX)
+            val wasSaved = entryId in _savedIds.value
+            _savedIds.update { if (wasSaved) it - entryId else it + entryId }
+            viewModelScope.launch {
+                val result =
+                    if (wasSaved) {
+                        io.github.aedev.flow.account.AccountPlaylists
+                            .remove(playlistId, videoId)
+                    } else {
+                        io.github.aedev.flow.account.AccountPlaylists
+                            .add(playlistId, videoId)
+                    }
+                if (result.isFailure) {
+                    _savedIds.update { ids -> if (wasSaved) ids + entryId else ids - entryId }
+                    _message.value = result.exceptionOrNull()?.message ?: "Couldn't update YouTube playlist"
+                }
+            }
+        }
+
         fun loadMembership(videoId: String) {
             if (loadedVideoId == videoId) return
             loadedVideoId = videoId
+            loadYoutube(videoId)
             _membershipLoaded.value = false
             viewModelScope.launch {
-                _savedIds.value = repository.getPlaylistIdsForVideo(videoId).toSet()
+                val local = repository.getPlaylistIdsForVideo(videoId).toSet()
+                _savedIds.update { ids -> local + ids.filter { it.startsWith(YT_PREFIX) } }
                 _membershipLoaded.value = true
             }
         }
@@ -68,6 +122,10 @@ class SaveVideoViewModel
             video: Video,
             collectionId: String,
         ) {
+            if (collectionId.startsWith(YT_PREFIX)) {
+                toggleYoutube(video.id, collectionId)
+                return
+            }
             if (!_membershipLoaded.value) return
             val wasSaved = collectionId in _savedIds.value
             _savedIds.update { if (wasSaved) it - collectionId else it + collectionId }

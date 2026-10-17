@@ -321,6 +321,13 @@ class SubscriptionRepository private constructor(
                 }
             }
         }
+        // Best effort: mirror the bell to the account; the local setting already applied either way.
+        if (io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn) {
+            io.github.aedev.flow.account.AccountChannelBell.set(
+                channelId,
+                if (enabled) io.github.aedev.flow.account.AccountChannelBell.Level.ALL else io.github.aedev.flow.account.AccountChannelBell.Level.NONE,
+            )
+        }
     }
 
     /**

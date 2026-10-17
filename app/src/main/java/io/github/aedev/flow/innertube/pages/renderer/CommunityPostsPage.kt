@@ -28,6 +28,10 @@ data class CommunityPost(
     val commentCountText: String,
     val commentEndpointParams: String?,
     val publishedTimeText: String,
+    /** The account's like on this post, and the action tokens that set or clear it. */
+    val isLiked: Boolean = false,
+    val likeAction: String? = null,
+    val unlikeAction: String? = null,
 )
 
 data class CommunityPostsPage(
@@ -186,6 +190,15 @@ internal fun JsonObject.toCommunityPost(
             .objectOrNull()
             ?.get("buttonRenderer")
             .objectOrNull()
+    val likeButton =
+        this["actionButtons"]
+            .objectOrNull()
+            ?.get("commentActionButtonsRenderer")
+            .objectOrNull()
+            ?.get("likeButton")
+            .objectOrNull()
+            ?.get("toggleButtonRenderer")
+            .objectOrNull()
     val navigationEndpoint = replyButton?.get("navigationEndpoint").objectOrNull()
     val authorAvatar =
         this["authorThumbnail"].bestThumbnailUrl()
@@ -221,8 +234,28 @@ internal fun JsonObject.toCommunityPost(
                     ?.get("params")
                     .stringOrNull(),
         publishedTimeText = this["publishedTimeText"].youtubeText().orEmpty(),
+        isLiked = likeButton?.get("isToggled").let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content == "true" },
+        likeAction = likeButton?.get("defaultServiceEndpoint").commentActionToken(),
+        unlikeAction = likeButton?.get("toggledServiceEndpoint").commentActionToken(),
     )
 }
+
+/** The `performCommentActionEndpoint` token anywhere under this endpoint, if there is one. */
+internal fun JsonElement?.commentActionToken(): String? =
+    when (this) {
+        is JsonObject -> {
+            (this["performCommentActionEndpoint"].objectOrNull()?.get("action") as? kotlinx.serialization.json.JsonPrimitive)?.content
+                ?: values.firstNotNullOfOrNull { it.commentActionToken() }
+        }
+
+        is JsonArray -> {
+            firstNotNullOfOrNull { it.commentActionToken() }
+        }
+
+        else -> {
+            null
+        }
+    }
 
 private fun findCommentCountText(root: JsonObject?): String? {
     val panels = root?.get("engagementPanels").arrayOrNull().orEmpty()

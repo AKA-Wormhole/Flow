@@ -20,13 +20,56 @@ data class GetLiveChatResponse(
     data class LiveChatContinuation(
         val continuations: List<Continuation> = emptyList(),
         val actions: List<Action> = emptyList(),
+        val actionPanel: ActionPanel? = null,
     )
+
+    /** The chat box. Present only when this session may chat; its send button holds the token a message needs. */
+    @Serializable
+    data class ActionPanel(
+        val liveChatMessageInputRenderer: InputRenderer? = null,
+    ) {
+        @Serializable
+        data class InputRenderer(
+            val sendButton: SendButton? = null,
+        )
+
+        @Serializable
+        data class SendButton(
+            val buttonRenderer: ButtonRenderer? = null,
+        )
+
+        @Serializable
+        data class ButtonRenderer(
+            val serviceEndpoint: ServiceEndpoint? = null,
+        )
+
+        @Serializable
+        data class ServiceEndpoint(
+            val sendLiveChatMessageEndpoint: SendEndpoint? = null,
+        )
+
+        @Serializable
+        data class SendEndpoint(
+            val params: String? = null,
+        )
+
+        fun sendParams(): String? =
+            liveChatMessageInputRenderer
+                ?.sendButton
+                ?.buttonRenderer
+                ?.serviceEndpoint
+                ?.sendLiveChatMessageEndpoint
+                ?.params
+    }
 
     @Serializable
     data class Continuation(
         val timedContinuationData: ContinuationData? = null,
         val invalidationContinuationData: ContinuationData? = null,
         val reloadContinuationData: ContinuationData? = null,
+        // Replay (`get_live_chat_replay`) hands back these two instead of the timed one.
+        val liveChatReplayContinuationData: ContinuationData? = null,
+        val playerSeekContinuationData: ContinuationData? = null,
     ) {
         @Serializable
         data class ContinuationData(
@@ -37,16 +80,33 @@ data class GetLiveChatResponse(
         fun token(): String? =
             timedContinuationData?.continuation
                 ?: invalidationContinuationData?.continuation
+                ?: liveChatReplayContinuationData?.continuation
                 ?: reloadContinuationData?.continuation
+                ?: playerSeekContinuationData?.continuation
 
-        fun timeoutMs(): Long? =
-            timedContinuationData?.timeoutMs ?: invalidationContinuationData?.timeoutMs
+        fun timeoutMs(): Long? = timedContinuationData?.timeoutMs ?: invalidationContinuationData?.timeoutMs
     }
 
     @Serializable
     data class Action(
         val addChatItemAction: AddChatItemAction? = null,
+        val removeChatItemAction: TargetItem? = null,
+        val markChatItemAsDeletedAction: TargetItem? = null,
+        val replayChatItemAction: ReplayChatItemAction? = null,
     ) {
+        /** A moderator removed (or struck through) the message with this id. */
+        @Serializable
+        data class TargetItem(
+            val targetItemId: String? = null,
+        )
+
+        /** Replay wraps each batch of ordinary actions with the video time they belong to. */
+        @Serializable
+        data class ReplayChatItemAction(
+            val actions: List<Action> = emptyList(),
+            val videoOffsetTimeMsec: String? = null,
+        )
+
         @Serializable
         data class AddChatItemAction(
             val item: Item? = null,
@@ -57,10 +117,11 @@ data class GetLiveChatResponse(
             val liveChatTextMessageRenderer: ChatMessageRenderer? = null,
             val liveChatPaidMessageRenderer: ChatMessageRenderer? = null,
             val liveChatMembershipItemRenderer: ChatMessageRenderer? = null,
+            val liveChatPaidStickerRenderer: ChatMessageRenderer? = null,
         )
     }
 
-    // One renderer shape covering text / paid / membership messages 
+    // One renderer shape covering text / paid / membership messages
     @Serializable
     data class ChatMessageRenderer(
         val id: String? = null,
@@ -74,6 +135,9 @@ data class GetLiveChatResponse(
         val purchaseAmountText: Text? = null,
         val bodyBackgroundColor: Long? = null,
         val headerBackgroundColor: Long? = null,
+        // Super Sticker only: the artwork, and the colour of the amount chip under it.
+        val sticker: ChatImage? = null,
+        val moneyChipBackgroundColor: Long? = null,
     )
 
     @Serializable
@@ -93,14 +157,21 @@ data class GetLiveChatResponse(
                 val image: ChatImage? = null,
             )
 
-            fun displayText(): String = when {
-                text != null -> text
-                emoji != null -> {
-                    val unicode = emoji.emojiId?.takeIf { emoji.isCustomEmoji != true }
-                    unicode ?: emoji.shortcuts.firstOrNull() ?: emoji.emojiId ?: ""
+            fun displayText(): String =
+                when {
+                    text != null -> {
+                        text
+                    }
+
+                    emoji != null -> {
+                        val unicode = emoji.emojiId?.takeIf { emoji.isCustomEmoji != true }
+                        unicode ?: emoji.shortcuts.firstOrNull() ?: emoji.emojiId ?: ""
+                    }
+
+                    else -> {
+                        ""
+                    }
                 }
-                else -> ""
-            }
         }
 
         fun plainText(): String = runs.joinToString("") { it.displayText() }
@@ -139,7 +210,9 @@ data class GetLiveChatResponse(
             val customThumbnail: ChatImage? = null,
         ) {
             @Serializable
-            data class Icon(val iconType: String? = null)
+            data class Icon(
+                val iconType: String? = null,
+            )
         }
     }
 }

@@ -97,6 +97,8 @@ data class Comment(
     val isArtist: Boolean = false,
     /** A GIF attached to the comment (a Tenor image), when YouTube returned one. */
     val gifUrl: String? = null,
+    /** The signed-in account's vote on this comment: 0 none, 1 liked, 2 disliked. */
+    val likeState: Int = 0,
 )
 
 enum class SearchFilter {

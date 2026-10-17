@@ -122,6 +122,7 @@ fun LiveChatList(
                         when (message.type) {
                             LiveChatMessageType.SUPER_CHAT -> SuperChatRow(message)
                             LiveChatMessageType.MEMBERSHIP -> MembershipRow(message)
+                            LiveChatMessageType.STICKER -> SuperStickerRow(message)
                             else -> ChatTextRow(message)
                         }
                     }
@@ -212,6 +213,46 @@ private fun MembershipRow(message: LiveChatMessage) {
                 fallback = message.message,
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurface,
+            )
+        }
+    }
+}
+
+@Composable
+private fun SuperStickerRow(message: LiveChatMessage) {
+    val chipColor = message.superChatArgb?.let { Color(it) } ?: MaterialTheme.colorScheme.tertiaryContainer
+    val onChip = if (chipColor.luminance() > 0.5f) Color.Black else Color.White
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ChatAvatar(message.authorPhotoUrl, message.memberBadgeUrl)
+        Spacer(Modifier.width(8.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = message.author,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            message.superChatAmount?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
+                    color = onChip,
+                    modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(chipColor).padding(horizontal = 8.dp, vertical = 2.dp),
+                )
+            }
+        }
+        message.stickerUrl?.let { url ->
+            AsyncImage(
+                model =
+                    ImageRequest
+                        .Builder(LocalContext.current)
+                        .data(url)
+                        .crossfade(true)
+                        .build(),
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
             )
         }
     }

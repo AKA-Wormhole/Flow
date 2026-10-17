@@ -233,7 +233,6 @@ class HomeChipFeeds
                 HomeChip.NewToYou -> videos(newToYou())
                 HomeChip.RecentlyUploaded -> videos(recentlyUploaded())
                 HomeChip.Mixes -> mixes().let { if (it.isEmpty()) ChipFeed.Empty else ChipFeed.Mixes(it) }
-                HomeChip.Live -> videos(live())
                 HomeChip.Watched -> videos(watchAgainVideos(HomeChipParams.MAX_VIDEOS))
             }
 
@@ -457,15 +456,28 @@ class HomeChipFeeds
                     .take(YOUTUBE_MIXES_MAX)
                     .map { playlist ->
                         async {
-                            val seedId = playlist.id.removePrefix("RDAMVM").removePrefix("RDMM").removePrefix("RD")
+                            val seedId =
+                                playlist.id
+                                    .removePrefix("RDAMVM")
+                                    .removePrefix("RDMM")
+                                    .removePrefix("RD")
                             if (seedId.length != VIDEO_ID_LENGTH) return@async null
                             val seed =
                                 Video(
                                     id = seedId,
-                                    title = playlist.name.removePrefix("Mix - ").removePrefix("Mix – ").removePrefix("Mix: "),
+                                    title =
+                                        playlist.name
+                                            .removePrefix("Mix - ")
+                                            .removePrefix("Mix – ")
+                                            .removePrefix("Mix: "),
                                     channelName = "",
                                     channelId = "",
-                                    thumbnailUrl = playlist.thumbnailUrl.ifBlank { ThumbnailUrlResolver.buildHighQualityYoutubeThumbnail(seedId) },
+                                    thumbnailUrl =
+                                        playlist.thumbnailUrl.ifBlank {
+                                            ThumbnailUrlResolver.buildHighQualityYoutubeThumbnail(
+                                                seedId,
+                                            )
+                                        },
                                     duration = 0,
                                     viewCount = 0,
                                     uploadDate = "",
@@ -496,31 +508,6 @@ class HomeChipFeeds
                     // Streams that have not started go after everything else, in the order YouTube gave.
                     .sortedBy { it.isUpcoming }
             return withSubscriptionAvatars(pool).take(HomeChipParams.MAX_VIDEOS)
-        }
-
-        /**
-         * Streams that are live now, then the ones scheduled to start. Results of a live-filtered
-         * search are live by definition, so they are trusted instead of re-checked against flags the
-         * search page often leaves unset; that re-check, plus the watched and taste filters, is what
-         * used to empty this chip.
-         */
-        private suspend fun live(): List<Video> {
-            val liveParams =
-                YouTubeSearchParams.build(
-                    contentType = YouTubeSearchParams.ContentType.VIDEO,
-                    features = setOf(YouTubeSearchParams.Feature.LIVE),
-                )
-            val interestLive = interests.take(2).mapNotNull { interestQueries(it, 1).firstOrNull() }.map { "$it live" }
-            val queries = listOf("live now", "live stream") + interestLive + listOf("live music", "live gaming", "live news")
-            val exclusions = context.exclusions()
-            val found =
-                (storedUploads().filter { it.isLive } + search(queries, liveParams))
-                    .distinctBy { it.id }
-                    .filter { !it.isShort }
-                    .filterNot(exclusions::hidesFromRecommendations)
-                    .map { if (it.isUpcoming) it else it.copy(isLive = true) }
-            val (soon, now) = found.partition { it.isUpcoming }
-            return withSubscriptionAvatars(now + soon).take(HomeChipParams.MAX_VIDEOS)
         }
 
         private suspend fun watchAgainVideos(limit: Int): List<Video> {

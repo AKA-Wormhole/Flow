@@ -25,6 +25,9 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PushPin
+import androidx.compose.material.icons.filled.ThumbDown
+import androidx.compose.material.icons.filled.ThumbUp
+import androidx.compose.material.icons.outlined.ThumbDown
 import androidx.compose.material.icons.outlined.ThumbUp
 import androidx.compose.material.icons.rounded.ExpandLess
 import androidx.compose.material.icons.rounded.ExpandMore
@@ -528,10 +531,9 @@ private fun CommentAuthorName(
 }
 
 /**
- * The like count, and the heart the creator left on this comment.
- *
- * The thumbs-down and reply icons that used to sit here were decoration: neither was clickable,
- * and neither has an action this app can perform without a signed-in session.
+ * Like and dislike (sent to YouTube as the signed-in account), the like count, and the heart the
+ * creator left on this comment. The thumbs are inert when signed out or when YouTube sent no action
+ * tokens for the comment.
  */
 @Composable
 internal fun CommentEngagementRow(
@@ -594,19 +596,53 @@ internal fun CommentEngagementRow(
         }
     }
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        // Voting needs a signed-in session (replyState is null otherwise) and the tokens YouTube sent with this page.
+        val vote = replyState?.votes?.get(comment.id) ?: comment.likeState
+        val canVote =
+            replyState != null &&
+                !comment.id.startsWith("local-") &&
+                io.github.aedev.flow.account.AccountActions
+                    .canVoteComment(comment.id)
+        val voteTint = MaterialTheme.colorScheme.primary
+        val idleTint = MaterialTheme.colorScheme.onSurfaceVariant
+        val onVoteError: (String) -> Unit = { Toast.makeText(context, it, Toast.LENGTH_SHORT).show() }
         Icon(
-            imageVector = Icons.Outlined.ThumbUp,
+            imageVector = if (vote == 1) Icons.Filled.ThumbUp else Icons.Outlined.ThumbUp,
             contentDescription = stringResource(R.string.like),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.size(14.dp),
+            tint = if (vote == 1) voteTint else idleTint,
+            modifier =
+                Modifier
+                    .size(18.dp)
+                    .clip(CircleShape)
+                    .clickable(enabled = canVote) { replyState?.vote(scope, comment, if (vote == 1) 0 else 1, onVoteError) },
         )
-        val likeText = comment.likeCountText.takeIf { it.isNotBlank() } ?: comment.likeCount.takeIf { it > 0 }?.let(::formatLikeCount)
+        // YouTube shows the count it loaded with; a like made here adds one locally until the list reloads.
+        val shownLikes = comment.likeCount + (if (vote == 1) 1 else 0) - (if (comment.likeState == 1) 1 else 0)
+        val likeText =
+            if (shownLikes != comment.likeCount) {
+                formatLikeCount(shownLikes.coerceAtLeast(0))
+            } else {
+                comment.likeCountText.takeIf { it.isNotBlank() } ?: comment.likeCount.takeIf { it > 0 }?.let(::formatLikeCount)
+            }
         if (likeText != null) {
             Spacer(modifier = Modifier.width(6.dp))
             Text(
                 text = likeText,
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (replyState != null) {
+            Spacer(modifier = Modifier.width(12.dp))
+            Icon(
+                imageVector = if (vote == 2) Icons.Filled.ThumbDown else Icons.Outlined.ThumbDown,
+                contentDescription = stringResource(R.string.dislike),
+                tint = if (vote == 2) voteTint else idleTint,
+                modifier =
+                    Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .clickable(enabled = canVote) { replyState.vote(scope, comment, if (vote == 2) 0 else 2, onVoteError) },
             )
         }
         if (comment.isHearted) {

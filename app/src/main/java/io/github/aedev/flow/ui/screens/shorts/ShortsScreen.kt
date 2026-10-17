@@ -78,6 +78,7 @@ fun ShortsScreen(
     onSoundClick: (browseId: String, params: String, title: String, videoId: String) -> Unit = { _, _, _, _ -> },
     bottomNavOverlayPadding: Dp = 0.dp,
     modifier: Modifier = Modifier,
+    onOpenLive: (() -> Unit)? = null,
     viewModel: ShortsViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -146,6 +147,8 @@ fun ShortsScreen(
 
     val sheetInsets = rememberShortsSheetInsetState()
     val density = LocalDensity.current
+    // The Live pill is offered only while the viewer has the current short paused.
+    var currentShortPaused by remember { mutableStateOf(false) }
 
     BoxWithConstraints(
         modifier =
@@ -180,6 +183,17 @@ fun ShortsScreen(
                 ShortsPipActionEffect(pagerState = pagerState, isInPip = isInPip)
 
                 LaunchedEffect(pagerState.currentPage) { viewModel.updateCurrentIndex(pagerState.currentPage) }
+                LaunchedEffect(pagerState.settledPage, uiState.shorts) {
+                    val id = uiState.shorts.getOrNull(pagerState.settledPage)?.id
+                    val pool = ShortsPlayerPool.getInstance()
+                    while (true) {
+                        val owned = pool.ownedPlayer(pagerState.settledPage, id)
+                        currentShortPaused =
+                            owned != null && !owned.isPlaying && !owned.playWhenReady &&
+                            owned.playbackState == androidx.media3.common.Player.STATE_READY
+                        kotlinx.coroutines.delay(250)
+                    }
+                }
                 LaunchedEffect(pagerState.settledPage) {
                     if (settingsSheet.isOpen && settingsSheet.targetIndex != pagerState.settledPage) settingsSheet.close()
                 }
@@ -331,6 +345,7 @@ fun ShortsScreen(
             showBackButton = source != ShortsQueueSource.Feed,
             onBack = onBack,
             modifier = Modifier.align(Alignment.TopCenter),
+            onOpenLive = onOpenLive.takeIf { currentShortPaused },
         )
 
         if (isInPip) return@BoxWithConstraints

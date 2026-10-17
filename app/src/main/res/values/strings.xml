@@ -140,6 +140,10 @@
     <string name="close">Close</string>
     <string name="more_options">More options</string>
     <string name="like">Like</string>
+    <string name="dislike">Dislike</string>
+    <string name="live_label">Live</string>
+    <string name="live_feed_empty">No live streams right now</string>
+    <string name="live_stream_unavailable">This stream can't be played</string>
     <string name="shuffle">Shuffle</string>
     <string name="previous">Previous</string>
     <string name="pause">Pause</string>

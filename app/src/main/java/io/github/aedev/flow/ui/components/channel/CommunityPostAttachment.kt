@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,6 +46,7 @@ import io.github.aedev.flow.ui.theme.extendedColors
 import io.github.aedev.flow.utils.ThumbnailUrlResolver
 import io.github.aedev.flow.utils.formatDuration
 import io.github.aedev.flow.utils.formatViewCount
+import kotlinx.coroutines.launch
 
 @Composable
 internal fun CommunityPostAttachment(
@@ -141,19 +143,43 @@ private fun PostPoll(
     poll: PostAttachment.Poll,
     modifier: Modifier = Modifier,
 ) {
+    // Voting sends the choice's token to YouTube once; results refresh the next time the post loads.
+    var votedIndex by remember(poll) { mutableStateOf<Int?>(null) }
+    val voteScope = rememberCoroutineScope()
+    val voteContext = androidx.compose.ui.platform.LocalContext.current
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = PostHorizontalPadding),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        poll.choices.forEach { choice ->
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        poll.choices.forEachIndexed { index, choice ->
+            Column(
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+                modifier =
+                    Modifier.clickable(enabled = choice.voteAction != null && votedIndex == null) {
+                        votedIndex = index
+                        voteScope.launch {
+                            val result =
+                                io.github.aedev.flow.account.AccountActions
+                                    .sendAction(choice.voteAction!!)
+                            if (result.isFailure) {
+                                votedIndex = null
+                                android.widget.Toast
+                                    .makeText(
+                                        voteContext,
+                                        result.exceptionOrNull()?.message ?: "Couldn't vote",
+                                        android.widget.Toast.LENGTH_SHORT,
+                                    ).show()
+                            }
+                        }
+                    },
+            ) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = choice.text,
+                        text = if (votedIndex == index) "✓ " + choice.text else choice.text,
                         style = MaterialTheme.typography.bodyMedium,
                         modifier = Modifier.weight(1f, fill = false),
                         maxLines = 2,

@@ -55,5 +55,6 @@ fun FlowLiveChatBottomSheet(
                     .weight(1f),
             contentPadding = PaddingValues(vertical = 8.dp),
         )
+        LiveChatComposer()
     }
 }

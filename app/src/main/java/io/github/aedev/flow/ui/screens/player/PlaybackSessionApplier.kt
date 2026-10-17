@@ -425,6 +425,12 @@ internal class PlaybackSessionApplier(
         secondaryMetadata.loadHeatmap(videoId, load.token)
         secondaryMetadata.loadChapters(videoId, load.token)
         secondaryMetadata.loadWatchInfo(videoId, identity.enrichedVideo, load.token)
+        // A finished stream or premiere may have kept its chat: offer it as a replay that follows the playhead.
+        if (result.playerResponse.videoDetails?.isLiveContent == true && result.playerResponse.videoDetails?.isLive != true) {
+            liveChat.startReplay(videoId) {
+                withContext(Dispatchers.Main) { playerManager.getPlayer()?.currentPosition ?: 0L }
+            }
+        }
         secondaryMetadata.loadChannelMetadata(
             videoId = videoId,
             uploaderUrl = null,

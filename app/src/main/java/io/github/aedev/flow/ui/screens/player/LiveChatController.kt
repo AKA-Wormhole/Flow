@@ -43,11 +43,17 @@ internal class LiveChatController(
     private var pendingContinuation: String? = null
     private val seen = LinkedHashSet<String>()
 
+    // Replay only: the recording's chat is paced by the video position instead of a poll timer.
+    private var replayToken: String? = null
+    private var playbackPositionMs: (suspend () -> Long)? = null
+
     fun start(videoId: String) {
         if (this.videoId == videoId) return
         stop()
         this.videoId = videoId
         seen.clear()
+        io.github.aedev.flow.data.repository.LiveChatSession
+            .reset()
         _messages.value = emptyList()
         _isLoading.value = true
         _isAvailable.value = false
@@ -68,6 +74,40 @@ internal class LiveChatController(
             }
     }
 
+    /**
+     * Chat of a finished stream or premiere. It is only offered when YouTube says the video has a
+     * recorded chat, and its messages appear as the video reaches the moment they were sent.
+     */
+    fun startReplay(
+        videoId: String,
+        positionMs: suspend () -> Long,
+    ) {
+        if (this.videoId == videoId) return
+        stop()
+        this.videoId = videoId
+        seen.clear()
+        io.github.aedev.flow.data.repository.LiveChatSession
+            .reset()
+        _messages.value = emptyList()
+        _isLoading.value = true
+        _isAvailable.value = false
+        playbackPositionMs = positionMs
+
+        probeJob =
+            scope.launch(dispatcher) {
+                val seed = repository.seed(videoId)
+                if (this@LiveChatController.videoId != videoId) return@launch
+                if (seed == null || !seed.isReplay) {
+                    _isLoading.value = false
+                    return@launch
+                }
+                replayToken = seed.continuation
+                _isAvailable.value = true
+                _isLoading.value = false
+                if (panelVisible) startReplayDrip(videoId)
+            }
+    }
+
     fun stop() {
         probeJob?.cancel()
         probeJob = null
@@ -75,6 +115,13 @@ internal class LiveChatController(
         dripJob = null
         videoId = null
         pendingContinuation = null
+        replayToken = null
+        playbackPositionMs = null
+    }
+
+    private fun dropRemoved(ids: Set<String>) {
+        if (ids.isEmpty()) return
+        _messages.update { current -> current.filterNot { it.id in ids } }
     }
 
     fun setPanelVisible(visible: Boolean) {
@@ -85,7 +132,63 @@ internal class LiveChatController(
             dripJob = null
             return
         }
-        videoId?.takeIf { _isAvailable.value }?.let(::startDrip)
+        videoId?.takeIf { _isAvailable.value }?.let { if (playbackPositionMs != null) startReplayDrip(it) else startDrip(it) }
+    }
+
+    private fun startReplayDrip(videoId: String) {
+        if (dripJob?.isActive == true) return
+        val position = playbackPositionMs ?: return
+        val seedToken = replayToken ?: return
+
+        dripJob =
+            scope.launch(dispatcher) {
+                var continuation: String? = seedToken
+                var fetchedUntilMs = Long.MIN_VALUE
+                var nextFetchAt = 0L
+                var lastPosition = position()
+                var failures = 0
+                val pending = ArrayDeque<LiveChatMessage>()
+                // Panel reopened or video sought: what was shown is rebuilt from the playhead.
+                _messages.value = emptyList()
+                seen.clear()
+
+                while (isActive && this@LiveChatController.videoId == videoId) {
+                    val now = position()
+                    if (now < lastPosition - SEEK_BACK_MS || now > lastPosition + SEEK_FORWARD_MS) {
+                        pending.clear()
+                        seen.clear()
+                        _messages.value = emptyList()
+                        continuation = seedToken
+                        fetchedUntilMs = Long.MIN_VALUE
+                        nextFetchAt = 0L
+                    }
+                    lastPosition = now
+
+                    val clock = System.currentTimeMillis()
+                    if (continuation != null && fetchedUntilMs < now + REPLAY_LOOKAHEAD_MS && clock >= nextFetchAt) {
+                        val page = repository.poll(continuation, replayOffsetMs = now.coerceAtLeast(0L))
+                        if (page == null) {
+                            failures++
+                            if (failures >= MAX_FAILURES) break
+                            nextFetchAt = clock + RETRY_MS
+                        } else {
+                            failures = 0
+                            page.messages.forEach { if (seen.add(it.id)) pending.addLast(it) }
+                            dropRemoved(page.removedIds)
+                            pending.removeAll { it.id in page.removedIds }
+                            val newest = page.messages.mapNotNull { it.offsetMs }.maxOrNull()
+                            fetchedUntilMs = maxOf(fetchedUntilMs, newest ?: Long.MIN_VALUE, now + page.timeoutMs)
+                            continuation = page.nextContinuation ?: continuation
+                            nextFetchAt = clock + page.timeoutMs
+                        }
+                    }
+
+                    while (pending.isNotEmpty() && (pending.first().offsetMs ?: Long.MIN_VALUE) <= now) {
+                        append(pending.removeFirst())
+                    }
+                    delay(REPLAY_TICK_MS)
+                }
+            }
     }
 
     private fun startDrip(videoId: String) {
@@ -107,6 +210,7 @@ internal class LiveChatController(
                     }
                     consecutiveFailures = 0
 
+                    dropRemoved(page.removedIds)
                     val fresh = page.messages.filter { seen.add(it.id) }
                     val visibleFresh =
                         if (isInitialPage) {
@@ -160,5 +264,9 @@ internal class LiveChatController(
         const val INITIAL_BACKFILL_MESSAGES = 12
         const val MIN_DRIP_MS = 90L
         const val MAX_DRIP_MS = 250L
+        const val REPLAY_TICK_MS = 400L
+        const val REPLAY_LOOKAHEAD_MS = 8_000L
+        const val SEEK_BACK_MS = 1_500L
+        const val SEEK_FORWARD_MS = 6_000L
     }
 }

@@ -304,6 +304,14 @@ fun ChannelScreen(
                 hasMore = communityUiState.commentsContinuation != null,
                 onLoadReplies = viewModel::loadCommunityCommentReplies,
                 onLoadMoreReplies = viewModel::loadMoreCommunityCommentReplies,
+                onPostComment =
+                    if (io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn) {
+                        io.github.aedev.flow.ui.components.shared.rememberCommentPoster { text, done ->
+                            viewModel.postCommunityComment(text, done)
+                        }
+                    } else {
+                        null
+                    },
                 onAuthorClick = { authorChannelId ->
                     if (authorChannelId.isNotBlank()) onChannelClick(authorChannelId)
                 },

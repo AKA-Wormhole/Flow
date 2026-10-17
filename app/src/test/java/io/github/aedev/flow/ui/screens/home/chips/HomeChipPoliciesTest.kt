@@ -135,10 +135,10 @@ class HomeChipPoliciesTest {
     fun `a chip result is reused until its time to live runs out`() {
         val cache = ChipResultCache()
         val feed = ChipFeed.Videos(listOf(video("a")))
-        cache.put(HomeChip.Live, feed, now)
+        cache.put(HomeChip.Watched, feed, now)
 
-        assertThat(cache.get(HomeChip.Live, now + HomeChip.Live.ttlMs - 1)).isEqualTo(feed)
-        assertThat(cache.get(HomeChip.Live, now + HomeChip.Live.ttlMs)).isNull()
+        assertThat(cache.get(HomeChip.Watched, now + HomeChip.Watched.ttlMs - 1)).isEqualTo(feed)
+        assertThat(cache.get(HomeChip.Watched, now + HomeChip.Watched.ttlMs)).isNull()
     }
 
     @Test
@@ -158,7 +158,7 @@ class HomeChipPoliciesTest {
         val cache = ChipResultCache()
         cache.put(HomeChip.RecentlyUploaded, ChipFeed.Empty, now)
 
-        assertThat(cache.emptyKeys(listOf(HomeChip.RecentlyUploaded, HomeChip.Live), now)).containsExactly("recent")
+        assertThat(cache.emptyKeys(listOf(HomeChip.RecentlyUploaded, HomeChip.Watched), now)).containsExactly("recent")
         assertThat(cache.emptyKeys(listOf(HomeChip.RecentlyUploaded), now + HomeChip.HOUR)).isEmpty()
     }
 }

@@ -114,6 +114,14 @@ internal fun JsonObject.toModernComment(
         likeCountText = likeCountText,
         pinnedByText = resolvedPinnedText,
         isHearted = toolbarState?.get("heartState").stringOrNull() == HEART_STATE_HEARTED,
+        likeState =
+            toolbarState?.get("likeState").stringOrNull().orEmpty().uppercase().let {
+                when {
+                    "DISLIKE" in it -> 2
+                    "LIKED" in it -> 1
+                    else -> 0
+                }
+            },
         heartedByText = toolbar?.get("heartActiveTooltip").stringOrNull(),
         isVerified = author?.get("isVerified").booleanOrFalse(),
         isCreator = author?.get("isCreator").booleanOrFalse(),

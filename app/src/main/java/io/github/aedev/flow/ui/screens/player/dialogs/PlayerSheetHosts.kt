@@ -326,5 +326,7 @@ internal fun PlayerLiveChatColumn(
             isLoading = isLoading,
             modifier = Modifier.fillMaxWidth().weight(1f),
         )
+        io.github.aedev.flow.ui.components.videoplayer.sheet
+            .LiveChatComposer()
     }
 }

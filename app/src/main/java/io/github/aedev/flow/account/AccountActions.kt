@@ -1,10 +1,10 @@
 package io.github.aedev.flow.account
 
+import io.github.aedev.flow.data.model.Comment
 import io.github.aedev.flow.innertube.YouTube
+import io.github.aedev.flow.innertube.pages.toPostedComment
 import io.ktor.client.statement.bodyAsText
 import io.ktor.http.isSuccess
-import io.github.aedev.flow.data.model.Comment
-import io.github.aedev.flow.innertube.pages.toPostedComment
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -27,6 +27,116 @@ object AccountActions {
     private val notInterestedTokens = ConcurrentHashMap<String, String>()
     private val editParams = ConcurrentHashMap<String, String>()
     private val deleteTokens = ConcurrentHashMap<String, String>()
+    private val voteTokens = ConcurrentHashMap<String, CommentVoteTokens>()
+    private val historyRemoveTokens = ConcurrentHashMap<String, String>()
+
+    /** The feedback token that removes [videoId] from YouTube watch history, if its history entry was loaded. */
+    fun historyRemoveToken(videoId: String): String? = historyRemoveTokens[videoId]
+
+    /** The four like/dislike action tokens YouTube hands out for one comment; any may be missing. */
+    data class CommentVoteTokens(
+        val like: String? = null,
+        val unlike: String? = null,
+        val dislike: String? = null,
+        val undislike: String? = null,
+    )
+
+    enum class CommentVote { LIKE, UNLIKE, DISLIKE, UNDISLIKE }
+
+    /**
+     * Remembers the like/dislike action tokens in a comments response, keyed by comment id. They sit under
+     * the like and dislike buttons' commands (the toggled variant undoes the vote), so the path to each
+     * `performCommentActionEndpoint` says which action it is. No request of its own is needed.
+     */
+    fun rememberCommentVoteActions(root: JsonElement) {
+        fun walk(
+            node: JsonElement,
+            path: String,
+        ) {
+            when (node) {
+                is JsonObject -> {
+                    (node["performCommentActionEndpoint"] as? JsonObject)?.let { endpoint ->
+                        val token = (endpoint["action"] as? JsonPrimitive)?.contentOrNull
+                        val p = path.lowercase()
+                        val undo = "toggled" in p || "undo" in p || "unlike" in p || "undislike" in p
+                        val kind =
+                            when {
+                                "dislike" in p -> if (undo) CommentVote.UNDISLIKE else CommentVote.DISLIKE
+                                "like" in p -> if (undo) CommentVote.UNLIKE else CommentVote.LIKE
+                                else -> null
+                            }
+                        val id = token?.let(::commentIdOf)
+                        if (token != null && kind != null && id != null) {
+                            val cur = voteTokens[id] ?: CommentVoteTokens()
+                            if (voteTokens.size >= MAX_ENTRIES * 2) voteTokens.clear()
+                            voteTokens[id] =
+                                when (kind) {
+                                    CommentVote.LIKE -> cur.copy(like = token)
+                                    CommentVote.UNLIKE -> cur.copy(unlike = token)
+                                    CommentVote.DISLIKE -> cur.copy(dislike = token)
+                                    CommentVote.UNDISLIKE -> cur.copy(undislike = token)
+                                }
+                        }
+                    }
+                    node.forEach { (k, v) -> walk(v, "$path/$k") }
+                }
+
+                is JsonArray -> {
+                    node.forEach { walk(it, path) }
+                }
+
+                else -> {
+                    Unit
+                }
+            }
+        }
+        walk(root, "")
+    }
+
+    /** Runs one action token as the signed-in account (a post like, a poll vote); the token says what it does. */
+    suspend fun sendAction(token: String): Result<Unit> =
+        runCatching {
+            val response = YouTube.innerTube.accountCommentAction(token)
+            check(response.status.isSuccess()) { "HTTP ${response.status.value}" }
+            check(!response.bodyAsText().contains("\"errors\"")) { "YouTube rejected that" }
+        }
+
+    /** True when YouTube gave this session a like action for the comment, i.e. voting can work. */
+    fun canVoteComment(commentId: String): Boolean = lookup(voteTokens, commentId) { it.like ?: it.unlike } != null
+
+    /** Sends the vote to YouTube as the signed-in account. */
+    suspend fun voteComment(
+        commentId: String,
+        vote: CommentVote,
+    ): Result<Unit> =
+        runCatching {
+            val tokens = lookup(voteTokens, commentId) { true } ?: error("This comment can't be rated")
+            val token =
+                when (vote) {
+                    CommentVote.LIKE -> tokens.like
+                    CommentVote.UNLIKE -> tokens.unlike
+                    CommentVote.DISLIKE -> tokens.dislike
+                    CommentVote.UNDISLIKE -> tokens.undislike
+                } ?: error("This comment can't be rated")
+            val response = YouTube.innerTube.accountCommentAction(token)
+            check(response.status.isSuccess()) { "HTTP ${response.status.value}" }
+            check(!response.bodyAsText().contains("\"errors\"")) { "YouTube rejected the vote" }
+        }
+
+    private fun <T> lookup(
+        map: ConcurrentHashMap<String, T>,
+        commentId: String,
+        accept: (T) -> Any?,
+    ): T? =
+        (
+            map[commentId] ?: map.entries
+                .firstOrNull { (k, _) ->
+                    k.startsWith(commentId) && k.length <= commentId.length + 3
+                }?.value
+        )?.takeIf {
+            accept(it) !=
+                null
+        }
 
     fun rememberCommentParams(
         videoId: String,
@@ -172,6 +282,7 @@ object AccountActions {
                     val menu = node["menu"]
                     if (id != null && menu != null) {
                         notInterestedToken(menu)?.let { put(notInterestedTokens, id, it) }
+                        findHistoryRemoveToken(menu)?.let { put(historyRemoveTokens, id, it) }
                     }
                     node.values.forEach(::walk)
                 }
@@ -186,6 +297,35 @@ object AccountActions {
             }
         }
         walk(root)
+    }
+
+    /** A history entry's menu item that deletes it carries a feedback token (playlist removals use another endpoint). */
+    private fun findHistoryRemoveToken(menu: JsonElement): String? {
+        var found: String? = null
+
+        fun walk(node: JsonElement) {
+            if (found != null) return
+            when (node) {
+                is JsonObject -> {
+                    val icon = ((node["icon"] as? JsonObject)?.get("iconType") as? JsonPrimitive)?.contentOrNull
+                    if (icon == "DELETE" || icon == "REMOVE") {
+                        found = findString(node, "feedbackToken")
+                        if (found != null) return
+                    }
+                    node.values.forEach(::walk)
+                }
+
+                is JsonArray -> {
+                    node.forEach(::walk)
+                }
+
+                else -> {
+                    Unit
+                }
+            }
+        }
+        walk(menu)
+        return found
     }
 
     private fun notInterestedToken(menu: JsonElement): String? {
