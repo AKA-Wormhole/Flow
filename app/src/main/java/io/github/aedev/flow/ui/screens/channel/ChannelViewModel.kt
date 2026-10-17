@@ -158,8 +158,8 @@ class ChannelViewModel
         private var requestedChannelUrl: String? = null
         internal val communityUiState: StateFlow<ChannelCommunityUiState> = communityController.state
 
-        private val _store = MutableStateFlow(ChannelStoreUiState())
-        internal val store: StateFlow<ChannelStoreUiState> = _store.asStateFlow()
+        private val storeState = MutableStateFlow(ChannelStoreUiState())
+        internal val store: StateFlow<ChannelStoreUiState> = storeState.asStateFlow()
 
         private var storeJob: Job? = null
 
@@ -171,8 +171,8 @@ class ChannelViewModel
         fun loadStore() {
             val state = _uiState.value
             val channelId = state.channelId ?: return
-            if (_store.value.isLoading || _store.value.loaded) return
-            _store.update { it.copy(isLoading = true, error = false) }
+            if (storeState.value.isLoading || storeState.value.loaded) return
+            storeState.update { it.copy(isLoading = true, error = false) }
             val params = state.tabParams(ChannelTabKind.Store).orEmpty()
             storeJob?.cancel()
             storeJob =
@@ -190,13 +190,13 @@ class ChannelViewModel
                     }
                     if (_uiState.value.channelId != channelId) return@launch
                     result!!.fold(
-                        onSuccess = { products -> _store.value = ChannelStoreUiState(products = products, loaded = true) },
+                        onSuccess = { products -> storeState.value = ChannelStoreUiState(products = products, loaded = true) },
                         onFailure = { error ->
                             if (error is kotlinx.coroutines.CancellationException && error !is kotlinx.coroutines.TimeoutCancellationException) {
                                 throw error
                             }
                             Log.e(TAG, "Failed to load store", error)
-                            _store.value = ChannelStoreUiState(error = true)
+                            storeState.value = ChannelStoreUiState(error = true)
                         },
                     )
                 }
@@ -276,7 +276,7 @@ class ChannelViewModel
                             )
                         }
                         storeJob?.cancel()
-                        _store.value = ChannelStoreUiState()
+                        storeState.value = ChannelStoreUiState()
                         communityController.reset(channelId, header.title, header.avatarUrl)
                         loadSubscriptionState(channelId)
                         observeNote(channelId)

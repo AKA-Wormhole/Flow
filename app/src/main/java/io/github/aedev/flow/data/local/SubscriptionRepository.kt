@@ -325,7 +325,11 @@ class SubscriptionRepository private constructor(
         if (io.github.aedev.flow.innertube.YouTube.innerTube.isSignedIn) {
             io.github.aedev.flow.account.AccountChannelBell.set(
                 channelId,
-                if (enabled) io.github.aedev.flow.account.AccountChannelBell.Level.ALL else io.github.aedev.flow.account.AccountChannelBell.Level.NONE,
+                if (enabled) {
+                    io.github.aedev.flow.account.AccountChannelBell.Level.ALL
+                } else {
+                    io.github.aedev.flow.account.AccountChannelBell.Level.NONE
+                },
             )
         }
     }
